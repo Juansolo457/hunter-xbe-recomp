@@ -85,6 +85,26 @@ X86Func* Find(uint32_t guest);
 #define SYM_IDirectSoundBuffer_SetEG FFFFFF0E
 #define HAS_IDirectSoundBuffer_SetEG 0
 #endif
+#ifndef SYM_IDirectSoundBuffer_AddRef
+#define SYM_IDirectSoundBuffer_AddRef FFFFFF0F
+#define HAS_IDirectSoundBuffer_AddRef 0
+#endif
+#ifndef SYM_IDirectSound_SetAllParameters
+#define SYM_IDirectSound_SetAllParameters FFFFFF10
+#define HAS_IDirectSound_SetAllParameters 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetOutputBuffer
+#define SYM_CDirectSoundStream_SetOutputBuffer FFFFFF11
+#define HAS_CDirectSoundStream_SetOutputBuffer 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetPitch
+#define SYM_IDirectSoundBuffer_SetPitch FFFFFF12
+#define HAS_IDirectSoundBuffer_SetPitch 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetPitch
+#define SYM_CDirectSoundStream_SetPitch FFFFFF13
+#define HAS_CDirectSoundStream_SetPitch 0
+#endif
 
 namespace {
 
@@ -194,6 +214,8 @@ void ForgetBlocks(Voice& v) {
 }
 
 float Db(int32_t hundredths) { return hundredths <= -10000 ? 0.0f : std::pow(10.0f, hundredths / 2000.0f); }
+// DSound pitch: log2 of the playback rate over 48 kHz in 1/4096 steps (XAudioCalculatePitch's inverse)
+uint32_t PitchToFrequency(int32_t pitch) { return uint32_t(std::lround(48000.0 * std::exp2(pitch / 4096.0))); }
 
 uint32_t FramesOf(const Voice& v, uint32_t bytes) {
     if (v.tag == 0x69) return bytes / (36u * v.channels) * 64;  // WAVE_FORMAT_XBOX_ADPCM
@@ -741,6 +763,8 @@ static void AuditExports() {
         SYM(IDirectSoundBuffer_SetFormat), SYM(IDirectSoundBuffer_SetOutputBuffer), SYM(IDirectSoundBuffer_SetRolloffCurve),
         SYM(IDirectSoundBuffer_StopEx), SYM(IDirectSoundBuffer_Pause), SYM(IDirectSoundBuffer_SetEG),
         SYM(XAudioDownloadEffectsImage), SYM(DirectSoundCreateBuffer), SYM(IDirectSound_CreateSoundBuffer),
+        SYM(IDirectSoundBuffer_AddRef), SYM(IDirectSound_SetAllParameters), SYM(CDirectSoundStream_SetOutputBuffer),
+        SYM(IDirectSoundBuffer_SetPitch), SYM(CDirectSoundStream_SetPitch),
         SYM(IDirectSoundBuffer_Release), SYM(IDirectSoundBuffer_Unlock), SYM(IDirectSoundBuffer_SetBufferData),
         SYM(IDirectSoundBuffer_Play), SYM(IDirectSoundBuffer_Stop), SYM(IDirectSoundBuffer_SetLoopRegion),
         SYM(IDirectSoundBuffer_GetStatus), SYM(IDirectSoundBuffer_GetCurrentPosition), SYM(IDirectSoundBuffer_SetCurrentPosition),
@@ -836,6 +860,17 @@ HLE_STDCALL(IDirectSound_SetOrientation, 8) {
     for (int i = 0; i < 3; i++) {
         g_front[i] = F32(a[1 + i]);
         g_top[i] = F32(a[4 + i]);
+    }
+    return 0;
+}
+// (this, DS3DLISTENER, apply): dwSize, position, velocity, front, top, distance, rolloff and doppler factors; the
+// position and orientation as their own setters keep them, the rest unused as theirs are
+HLE_STDCALL(IDirectSound_SetAllParameters, 3) {
+    std::lock_guard<std::recursive_mutex> lock(g_lock);
+    for (int i = 0; i < 3; i++) {
+        g_listener[i] = F32(R32(a[1] + 0x04 + i * 4));
+        g_front[i] = F32(R32(a[1] + 0x1C + i * 4));
+        g_top[i] = F32(R32(a[1] + 0x28 + i * 4));
     }
     return 0;
 }
@@ -945,6 +980,8 @@ HLE_STDCALL(IDirectSound_CreateSoundBuffer, 4) { return NewBuffer(a[1], a[2]); }
     }                                                       \
     static uint32_t buf_##name([[maybe_unused]] Voice& v, [[maybe_unused]] const Args& a)
 
+// the library's AddRef calls through the console object's vtable, which a host buffer does not have
+BUFFER(AddRef, 1) { return uint32_t(++v.refs); }
 BUFFER(Release, 1) {
     if (--v.refs > 0) return uint32_t(v.refs);
     if (v.owned) mem::FreeContiguous(v.owned);
@@ -1042,6 +1079,10 @@ BUFFER(SetVolume, 2) {
 }
 BUFFER(SetFrequency, 2) {
     v.freq = a[1];
+    return 0;
+}
+BUFFER(SetPitch, 2) {
+    v.freq = PitchToFrequency(int32_t(a[1]));
     return 0;
 }
 BUFFER(SetFilter, 2) { return 0; }
@@ -1219,6 +1260,10 @@ STREAM(SetFrequency, 2) {
     v.freq = a[1];
     return 0;
 }
+STREAM(SetPitch, 2) {
+    v.freq = PitchToFrequency(int32_t(a[1]));
+    return 0;
+}
 STREAM(SetFilter, 2) { return 0; }
 // the library's own writes voice registers a host stream does not have; envelopes are not played
 HLE_STDCALL(IDirectSoundStream_SetEG, 2) { return 0; }
@@ -1230,6 +1275,7 @@ STREAM(SetMixBinVolumes, 2) {
     SetBinVolumes(v, a[1]);
     return 0;
 }
+STREAM(SetOutputBuffer, 2) { return 0; }  // the voice keeps its own mix bins, as a buffer's does
 STREAM(SetMixBins, 2) {
     SetBins(v, a[1]);
     return 0;

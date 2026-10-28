@@ -9,8 +9,9 @@ Everything here is MIT licensed, under two copyright holders. Copied code keeps 
    (same author).
 
 2. XboxXBE-Recomp SDK: MIT (LICENSES/XboxXBE-Recomp-MIT.txt), copyright TGP482
-   sdk/ is an unchanged copy of https://github.com/TGP482/XboxXBE-Recomp at the commit
-   sdk.toml names. config/xdk/4361/ follows the format of its sdk/xdk/<build> files. CMakeLists.txt, CMakePresets.json, build.bat, release.bat, config/game.toml's
+   sdk/ is a copy of https://github.com/TGP482/XboxXBE-Recomp at the commit sdk.toml names,
+   with this project's changes for XDK 4361 made in place (docs/HANDOFF.md lists them) so they
+   can go back upstream. config/xdk/4361/ follows the format of its sdk/xdk/<build> files. CMakeLists.txt, CMakePresets.json, build.bat, release.bat, config/game.toml's
    comments, src/common/game_info.cpp and src/game/hooks.cpp start from its templates/game.
    .github/ISSUE_TEMPLATE comes from TGP482's 007FRWL-XBERecomp (MIT).
    The libraries CMake fetches (Zydis, toml++, Dear ImGui, SDL3) and LLVM keep their own

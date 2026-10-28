@@ -36,8 +36,9 @@ Vulkan renderers).
 
 ## Conventions
 
-- `sdk/` stays as upstream ships it until the Linux phase. Hunter's XDK 4361 data lives in the
-  overlay `config/xdk/4361/` and goes upstream as a pull request once complete.
+- `sdk/` changes only where XDK 4361 support or an SDK bug needs it, portable and free of Hunter
+  specifics; each is listed in HANDOFF.md ("SDK changes to offer upstream"). Hunter's XDK 4361 data
+  lives in the overlay `config/xdk/4361/` and goes upstream as a pull request once complete.
 - Game code goes in `src/`. Fix analysis mistakes in `config/game.toml` (`[[function]]`,
   `[[switch]]`, `data_ranges`), never in `generated/`. Every address in the config says where
   it was proven.

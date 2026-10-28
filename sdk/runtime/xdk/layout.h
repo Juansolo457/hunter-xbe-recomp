@@ -171,3 +171,18 @@ constexpr bool AllKnown(const LayoutKey (&keys)[N]) {
 #ifndef XDK_XPP_Previous
 #define XDK_XPP_Previous 0xFFFFFFFFu
 #endif
+// the frame buffers' D3DMULTISAMPLE_TYPE the device keeps; the library's GetDesc reports it for the back buffer
+#ifndef XDK_CDevice_MultiSampleType
+#define XDK_CDevice_MultiSampleType 0xFFFFFFFFu
+#endif
+// The title's D3DRS numbering, where it differs from the 4831/5849 one gpu/state.h uses (d3d8.cpp,
+// GuestRs/HostRs): the title's index of D3DRS_FOGENABLE, D3DRS_PSTEXTUREMODES and D3DRS_DXT1NOISEENABLE
+#ifndef XDK_RenderState_Deferred
+#define XDK_RenderState_Deferred 0xFFFFFFFFu
+#endif
+#ifndef XDK_RenderState_Complex
+#define XDK_RenderState_Complex 0xFFFFFFFFu
+#endif
+#ifndef XDK_RenderState_Dxt1NoiseEnable
+#define XDK_RenderState_Dxt1NoiseEnable 0xFFFFFFFFu
+#endif
