@@ -105,6 +105,54 @@ X86Func* Find(uint32_t guest);
 #define SYM_CDirectSoundStream_SetPitch FFFFFF13
 #define HAS_CDirectSoundStream_SetPitch 0
 #endif
+#ifndef SYM_IDirectSoundBuffer_SetLFO
+#define SYM_IDirectSoundBuffer_SetLFO FFFFFF14
+#define HAS_IDirectSoundBuffer_SetLFO 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetNotificationPositions
+#define SYM_IDirectSoundBuffer_SetNotificationPositions FFFFFF15
+#define HAS_IDirectSoundBuffer_SetNotificationPositions 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetConeAngles
+#define SYM_IDirectSoundBuffer_SetConeAngles FFFFFF16
+#define HAS_IDirectSoundBuffer_SetConeAngles 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetConeOrientation
+#define SYM_IDirectSoundBuffer_SetConeOrientation FFFFFF17
+#define HAS_IDirectSoundBuffer_SetConeOrientation 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetConeOutsideVolume
+#define SYM_IDirectSoundBuffer_SetConeOutsideVolume FFFFFF18
+#define HAS_IDirectSoundBuffer_SetConeOutsideVolume 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetMode
+#define SYM_IDirectSoundBuffer_SetMode FFFFFF19
+#define HAS_IDirectSoundBuffer_SetMode 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetLFO
+#define SYM_CDirectSoundStream_SetLFO FFFFFF1A
+#define HAS_CDirectSoundStream_SetLFO 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetEG
+#define SYM_CDirectSoundStream_SetEG FFFFFF1B
+#define HAS_CDirectSoundStream_SetEG 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetAllParameters
+#define SYM_CDirectSoundStream_SetAllParameters FFFFFF1C
+#define HAS_CDirectSoundStream_SetAllParameters 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetConeAngles
+#define SYM_CDirectSoundStream_SetConeAngles FFFFFF1D
+#define HAS_CDirectSoundStream_SetConeAngles 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetConeOrientation
+#define SYM_CDirectSoundStream_SetConeOrientation FFFFFF1E
+#define HAS_CDirectSoundStream_SetConeOrientation 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetConeOutsideVolume
+#define SYM_CDirectSoundStream_SetConeOutsideVolume FFFFFF1F
+#define HAS_CDirectSoundStream_SetConeOutsideVolume 0
+#endif
 
 namespace {
 
@@ -765,6 +813,8 @@ static void AuditExports() {
         SYM(XAudioDownloadEffectsImage), SYM(DirectSoundCreateBuffer), SYM(IDirectSound_CreateSoundBuffer),
         SYM(IDirectSoundBuffer_AddRef), SYM(IDirectSound_SetAllParameters), SYM(CDirectSoundStream_SetOutputBuffer),
         SYM(IDirectSoundBuffer_SetPitch), SYM(CDirectSoundStream_SetPitch),
+        SYM(IDirectSoundBuffer_SetLFO), SYM(IDirectSoundBuffer_SetNotificationPositions), SYM(IDirectSoundBuffer_SetConeAngles), SYM(IDirectSoundBuffer_SetConeOrientation), SYM(IDirectSoundBuffer_SetConeOutsideVolume), SYM(IDirectSoundBuffer_SetMode),
+        SYM(CDirectSoundStream_SetLFO), SYM(CDirectSoundStream_SetEG), SYM(CDirectSoundStream_SetAllParameters), SYM(CDirectSoundStream_SetConeAngles), SYM(CDirectSoundStream_SetConeOrientation), SYM(CDirectSoundStream_SetConeOutsideVolume),
         SYM(IDirectSoundBuffer_Release), SYM(IDirectSoundBuffer_Unlock), SYM(IDirectSoundBuffer_SetBufferData),
         SYM(IDirectSoundBuffer_Play), SYM(IDirectSoundBuffer_Stop), SYM(IDirectSoundBuffer_SetLoopRegion),
         SYM(IDirectSoundBuffer_GetStatus), SYM(IDirectSoundBuffer_GetCurrentPosition), SYM(IDirectSoundBuffer_SetCurrentPosition),
@@ -1085,6 +1135,21 @@ BUFFER(SetPitch, 2) {
     v.freq = PitchToFrequency(int32_t(a[1]));
     return 0;
 }
+// LFOs and cones are not modelled, as the envelope and filter are not (SetEG, SetFilter)
+BUFFER(SetLFO, 2) { return 0; }
+BUFFER(SetConeAngles, 4) { return 0; }
+BUFFER(SetConeOrientation, 5) { return 0; }
+BUFFER(SetConeOutsideVolume, 3) { return 0; }
+// (this, mode, apply): DS3DMODE, as SetAllParameters keeps it
+BUFFER(SetMode, 3) {
+    v.mode = a[1];
+    return 0;
+}
+// TODO: the events are never signalled; nothing here tracks play positions against them yet
+BUFFER(SetNotificationPositions, 3) {
+    LOG_FIRST(1, "dsound: SetNotificationPositions (%u positions) accepted, its events are not signalled", a[1]);
+    return 0;
+}
 BUFFER(SetFilter, 2) { return 0; }
 BUFFER(SetHeadroom, 2) {
     v.headroom = Db(-int32_t(a[1]));
@@ -1264,6 +1329,19 @@ STREAM(SetPitch, 2) {
     v.freq = PitchToFrequency(int32_t(a[1]));
     return 0;
 }
+STREAM(SetLFO, 2) { return 0; }
+STREAM(SetEG, 2) { return 0; }
+// (this, DS3DBUFFER, apply), as the buffer's
+STREAM(SetAllParameters, 3) {
+    for (int i = 0; i < 3; i++) v.p[i] = F32(R32(a[1] + 4 + i * 4));
+    v.min_dist = F32(R32(a[1] + 0x34));
+    v.max_dist = F32(R32(a[1] + 0x38));
+    v.mode = R32(a[1] + 0x3C);
+    return 0;
+}
+STREAM(SetConeAngles, 4) { return 0; }
+STREAM(SetConeOrientation, 5) { return 0; }
+STREAM(SetConeOutsideVolume, 3) { return 0; }
 STREAM(SetFilter, 2) { return 0; }
 // the library's own writes voice registers a host stream does not have; envelopes are not played
 HLE_STDCALL(IDirectSoundStream_SetEG, 2) { return 0; }

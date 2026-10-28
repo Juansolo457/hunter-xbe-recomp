@@ -2,10 +2,7 @@
 
     python -I make_config.py trial_4831.toml oovpa.tsv oovpa2.tsv > game.toml
 
-Run in a scratch folder holding the inputs: trial_4831.toml and trial.log from xbe_symbols with the 4831
-signatures copied as <tmp>/4361 (see docs/FINDINGS.md), oovpa*.tsv from tools/oovpa_scan.py. Then add the
-"includes = [\"xdk/4361/layout.toml\"]" line and drop "xdk = 4361" from [xbe], as config/game.toml has.
-Each address says where it came from. Overrides by hand, each with its proof, are in HAND and DATA_HAND.
+Each address says where it came from. Overrides by hand are in HAND below.
 """
 import re
 import sys
@@ -41,6 +38,20 @@ HAND = {
                                               'CDirectSoundBuffer_SetPitch 0x213CD8; the DSOUND code at 0x21F964 '
                                               'calls it on a host buffer'),
     'CDirectSoundStream_SetPitch': (0x213EAC, 'oovpa 4134; IDirectSoundStream_SetPitch 0x21438B jumps to it'),
+    'IDirectSoundBuffer_SetLFO': (0x2141D2, 'oovpa 4039; wrapper (this - 0x1C, ret 8); the DSOUND synth 0x21F989 calls it'),
+    'IDirectSoundBuffer_SetNotificationPositions': (0x214366, 'oovpa 3911; wrapper (ret 0xC); the DSOUND synth 0x21FB2A calls it'),
+    'IDirectSoundBuffer_SetConeAngles': (0x2153FB, 'by hand: the wrapper xbe_symbols took for SetRolloffCurve; it calls '
+                                                   'CDirectSoundBuffer_SetConeAngles 0x214C4D (ret 0x10)'),
+    'IDirectSoundBuffer_SetConeOrientation': (0x21541F, 'oovpa 3911; wrapper (ret 0x14)'),
+    'IDirectSoundBuffer_SetConeOutsideVolume': (0x215454, 'oovpa 4039; wrapper (ret 0xC)'),
+    'IDirectSoundBuffer_SetMode': (0x2154BC, 'by hand: wrapper (this - 0x1C, ret 0xC) between SetMinDistance 0x215498 '
+                                             'and SetPosition 0x2154DC, the interface order'),
+    'CDirectSoundStream_SetLFO': (0x213F50, 'oovpa 4134; IDirectSoundStream_SetLFO 0x214390 jumps to it'),
+    'CDirectSoundStream_SetEG': (0x213FA2, 'oovpa 4134; IDirectSoundStream_SetEG 0x214395 jumps to it'),
+    'CDirectSoundStream_SetAllParameters': (0x21501E, 'oovpa 4134; IDirectSoundStream_SetAllParameters 0x215575 jumps to it'),
+    'CDirectSoundStream_SetConeAngles': (0x215074, 'oovpa 4134; IDirectSoundStream_SetConeAngles 0x21557A jumps to it'),
+    'CDirectSoundStream_SetConeOrientation': (0x2150CE, 'oovpa 4134 (ret 0x14)'),
+    'CDirectSoundStream_SetConeOutsideVolume': (0x215139, 'oovpa 4134 (ret 0xC)'),
     'XInputGetCapabilities': (0, 'xbe_symbols matched 0x25DB04 by constants (0.60); that code claims a '
                                  'device slot and counts opens, XInputOpen\'s job (XInputOpen is 0x25900D)'),
 }

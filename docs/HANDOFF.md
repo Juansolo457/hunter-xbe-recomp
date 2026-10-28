@@ -58,6 +58,15 @@ Each stop, its cause and the fix, in order:
 8. `D3DDevice_Reset` (`0x202C70`) ran the library's own frame buffer setup; mapped to the runtime's.
 9. **Black frames**: `D3D_InitDefaultState` (`0x208D30`) was not mapped, so no default render
    states (colour write mask 0, depth function NEVER). Mapped: the movies and the menu show.
+10. Crash picking a game mode in the menu: the DSOUND library's own synth (`0x21F9xx`, likely
+    DirectMusic's) calls buffer and stream methods the runtime lacked. A scan of every caller of
+    the buffer and stream methods found twelve: buffer SetLFO, SetNotificationPositions,
+    SetConeAngles, SetConeOrientation, SetConeOutsideVolume, SetMode; stream SetLFO, SetEG,
+    SetAllParameters and the three cone setters. All added to the runtime (LFOs and cones as
+    no-ops, as the envelope and filter already are; SetMode and stream SetAllParameters keep the
+    3D state). **SetNotificationPositions' events are never signalled** (the runtime has no
+    position notifications): if the synth's music or streams stall, start there. With this the
+    user got past the game mode to the character select.
 
 ## SDK changes to offer upstream (TGP482/XboxXBE-Recomp)
 `sdk/` was unchanged until this work; every change here is portable and game-agnostic:
@@ -65,7 +74,8 @@ Each stop, its cause and the fix, in order:
 - `runtime/xdk/d3d8.cpp`, `runtime/xdk/layout.h`: render state numbering for XDKs before 4627;
   `CDevice_MultiSampleType`.
 - `runtime/xdk/dsound.cpp`: `IDirectSoundBuffer_AddRef`, `IDirectSoundBuffer_SetPitch`,
-  `CDirectSoundStream_SetPitch`, `CDirectSoundStream_SetOutputBuffer`, `IDirectSound_SetAllParameters`.
+  `CDirectSoundStream_SetPitch`, `CDirectSoundStream_SetOutputBuffer`, `IDirectSound_SetAllParameters`,
+  and the twelve buffer and stream methods of step 10.
 - The 4361 overlay itself (`config/xdk/4361/layout.toml`, signatures still to sign).
 
 ## Next steps (M1)
