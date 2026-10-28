@@ -5,6 +5,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <deque>
+#include <cstdlib>
 #include <map>
 #include <optional>
 #include <vector>
@@ -152,6 +153,14 @@ X86Func* Find(uint32_t guest);
 #ifndef SYM_CDirectSoundStream_SetConeOutsideVolume
 #define SYM_CDirectSoundStream_SetConeOutsideVolume FFFFFF1F
 #define HAS_CDirectSoundStream_SetConeOutsideVolume 0
+#endif
+#ifndef SYM_IDirectSound_CreateSoundStream
+#define SYM_IDirectSound_CreateSoundStream FFFFFF20
+#define HAS_IDirectSound_CreateSoundStream 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetMode
+#define SYM_CDirectSoundStream_SetMode FFFFFF21
+#define HAS_CDirectSoundStream_SetMode 0
 #endif
 
 namespace {
@@ -724,6 +733,12 @@ void Start() {
 }
 
 // WAVEFORMATEX
+// XBE_AUDIO_LOG set: voices logged as they play (LogPlay) at the level release builds keep
+bool AudioLog() {
+    static const bool on = std::getenv("XBE_AUDIO_LOG") != nullptr;
+    return on;
+}
+
 void ReadFormat(Voice& v, uint32_t wfx) {
     if (!wfx) return;
     v.tag = R16(wfx);
@@ -732,6 +747,7 @@ void ReadFormat(Voice& v, uint32_t wfx) {
     v.align = std::max<uint16_t>(R16(wfx + 12), 1);
     v.bits = R16(wfx + 14);
     if (v.tag != 1 && v.tag != 0x69) LOG_FIRST(8, "dsound: format tag %X not supported", v.tag);
+    if (v.tag != 1 && v.tag != 0x69 && AudioLog()) LOGR("audio: format tag %X not supported (%u channels, %u bits)", v.tag, v.channels, v.bits);
 }
 
 // DSMIXBINS: the voice's bins and their volumes
@@ -822,7 +838,8 @@ static void AuditExports() {
         SYM(IDirectSoundBuffer_SetFilter), SYM(IDirectSoundBuffer_SetHeadroom), SYM(IDirectSoundBuffer_SetMixBinVolumes),
         SYM(IDirectSoundBuffer_SetMixBins), SYM(IDirectSoundBuffer_SetMaxDistance), SYM(IDirectSoundBuffer_SetMinDistance),
         SYM(IDirectSoundBuffer_SetPosition), SYM(IDirectSoundBuffer_SetVelocity), SYM(IDirectSoundBuffer_SetI3DL2Source),
-        SYM(DirectSoundCreateStream), SYM(CDirectSoundStream_AddRef), SYM(CDirectSoundStream_SetFormat),
+        SYM(DirectSoundCreateStream), SYM(IDirectSound_CreateSoundStream), SYM(CDirectSoundStream_SetMode),
+        SYM(CDirectSoundStream_AddRef), SYM(CDirectSoundStream_SetFormat),
         SYM(CDirectSoundStream_Release), SYM(CDirectSoundStream_GetInfo), SYM(CDirectSoundStream_GetStatus),
         SYM(CDirectSoundStream_Process), SYM(CDirectSoundStream_Discontinuity), SYM(CDirectSoundStream_Flush),
         SYM(CDirectSoundStream_FlushEx), SYM(CDirectSoundStream_Pause), SYM(CDirectSoundStream_SetVolume),
@@ -1021,6 +1038,20 @@ HLE_STDCALL(IDirectSound_GetOutputLevels, 3) {
 HLE_STDCALL(DirectSoundCreateBuffer, 2) { return NewBuffer(a[0], a[1]); }
 HLE_STDCALL(IDirectSound_CreateSoundBuffer, 4) { return NewBuffer(a[1], a[2]); }
 
+// XBE_AUDIO_LOG set: each voice's first plays and what they play with, at the level release builds keep
+void LogPlay(const char* what, const Voice& v) {
+    if (!AudioLog()) return;
+    static std::map<uint32_t, int> seen;
+    if (seen[v.obj]++ >= 3) return;
+    float d[3] = {v.p[0] - g_listener[0], v.p[1] - g_listener[1], v.p[2] - g_listener[2]};
+    float dist = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    LOGR("audio: %s %08X tag %X %uch %uHz %ubit %u bytes, 3d %d mode %u dist %.1f (min %.1f max %.1f att %.3f) "
+         "vol %.3f headroom %.3f freq %u bins %u [%u %u %u %u]",
+         what, v.obj, v.tag, v.channels, v.rate, v.bits, v.bytes, v.is3d, v.mode, dist, v.min_dist, v.max_dist,
+         v.is3d && v.mode != 2 ? Attenuation(v, v.mode == 1 ? std::sqrt(Dot(v.p, v.p)) : dist) : 1.0f, v.volume,
+         v.headroom, v.freq, v.nbins, v.bin[0], v.bin[1], v.bin[2], v.bin[3]);
+}
+
 #define BUFFER(name, nargs)                                 \
     static uint32_t buf_##name(Voice& v, const Args& a);    \
     HLE_STDCALL(IDirectSoundBuffer_##name, nargs) {         \
@@ -1062,6 +1093,7 @@ BUFFER(Play, 4) {
     v.looping = a[3] & 1;
     if (a[3] & 2) v.pos = 0;
     v.sync = a[3] & 4;
+    LogPlay("buffer play", v);
     return 0;
 }
 BUFFER(Stop, 1) {
@@ -1201,12 +1233,12 @@ BUFFER(SetFormat, 2) {
 
 // streams, the object carries the XDK's own vtable
 
-HLE_STDCALL(DirectSoundCreateStream, 2) {
+// a stream for DSSTREAMDESC desc, its object stored at out
+uint32_t NewStream(uint32_t desc, uint32_t out) {
     XDK_REQUIRE("dsound", XDK_KEY(CDirectSoundStream_Vtable), XDK_KEY(CDirectSoundStream_Vtable2),
                 XDK_DATA(DSound_StreamVtable), XDK_DATA(DSound_StreamVtable2));
     std::lock_guard<std::recursive_mutex> lock(g_lock);
     Start();
-    uint32_t desc = a[0];
     uint32_t obj = mem::AllocSystem(0x80);
     std::memset(HostPtr(obj), 0, 0x80);
     W32(obj + XDK_CDirectSoundStream_Vtable, kStreamVtable);
@@ -1222,9 +1254,12 @@ HLE_STDCALL(DirectSoundCreateStream, 2) {
     SetBins(v, R32(desc + 20));
     v.is3d = flags & 0x10;  // DSBCAPS_CTRL3D
     v.headroom = DefaultHeadroom(flags);
-    W32(a[1], obj);
+    W32(out, obj);
     return 0;
 }
+HLE_STDCALL(DirectSoundCreateStream, 2) { return NewStream(a[0], a[1]); }
+// (this, desc, stream, unknown), as the buffers' IDirectSound_CreateSoundBuffer
+HLE_STDCALL(IDirectSound_CreateSoundStream, 4) { return NewStream(a[1], a[2]); }
 
 #define STREAM(name, nargs)                                     \
     static uint32_t str_##name(Voice& v, const Args& a);        \
@@ -1293,6 +1328,7 @@ STREAM(Process, 3) {
     if (pk.completed_ptr) W32(pk.completed_ptr, 0);
     if (pk.status_ptr) W32(pk.status_ptr, kPacketPending);
     v.packets.push_back(pk);
+    if (!v.active) LogPlay("stream starts", v);
     if (!v.active) v.has_gain = false;  // after going quiet a stream starts its levels fresh
     v.active = true;
     v.ending = false;
@@ -1342,6 +1378,10 @@ STREAM(SetAllParameters, 3) {
 STREAM(SetConeAngles, 4) { return 0; }
 STREAM(SetConeOrientation, 5) { return 0; }
 STREAM(SetConeOutsideVolume, 3) { return 0; }
+STREAM(SetMode, 3) {
+    v.mode = a[1];
+    return 0;
+}
 STREAM(SetFilter, 2) { return 0; }
 // the library's own writes voice registers a host stream does not have; envelopes are not played
 HLE_STDCALL(IDirectSoundStream_SetEG, 2) { return 0; }

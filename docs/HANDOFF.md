@@ -67,6 +67,18 @@ Each stop, its cause and the fix, in order:
     3D state). **SetNotificationPositions' events are never signalled** (the runtime has no
     position notifications): if the synth's music or streams stall, start there. With this the
     user got past the game mode to the character select.
+11. **Torn characters** (limbs, eyes, silhouettes in the wrong place; the user's screenshot, 2026-10-28):
+    Hunter skins characters with the fixed function pipeline: FVF `0x116` (one blend weight), the
+    engine's skinning setup `0x15F3E0` maps 2 3 4 bones to D3DRS_VERTEXBLEND 1 3 5 (table `0x2769AC`)
+    and sets each bone with `SetTransform(6 + i)` through its matrix cache `0x1609D0`. Two SDK gaps:
+    the fixed function vertex shader ignored VERTEXBLEND, and the render thread copied world matrix 0
+    only (an in-game F3 capture showed w1 all zeros). Both fixed in the SDK (vertex blending in
+    `gpu/shaders.cpp` with world 1 to 3 constants filled in `gpu/d3d12.cpp`; the render thread copies
+    the four world matrices). The user confirmed the characters are right.
+12. Weapon and enemy sounds are silent while ambience plays: still open. `IDirectSound_CreateSoundStream`
+    and the stream SetMode, SetMaxDistance, SetMinDistance, SetMixBinVolumes were added on the way (the
+    library synth calls them) but did not fix it. `XBE_AUDIO_LOG=1` logs each voice's first plays
+    (format, 3D, distance, attenuation, volume, bins) at the level release builds keep.
 
 ## SDK changes to offer upstream (TGP482/XboxXBE-Recomp)
 `sdk/` was unchanged until this work; every change here is portable and game-agnostic:
@@ -75,7 +87,11 @@ Each stop, its cause and the fix, in order:
   `CDevice_MultiSampleType`.
 - `runtime/xdk/dsound.cpp`: `IDirectSoundBuffer_AddRef`, `IDirectSoundBuffer_SetPitch`,
   `CDirectSoundStream_SetPitch`, `CDirectSoundStream_SetOutputBuffer`, `IDirectSound_SetAllParameters`,
-  and the twelve buffer and stream methods of step 10.
+  and the twelve buffer and stream methods of step 10; `IDirectSound_CreateSoundStream`, stream SetMode;
+  the `XBE_AUDIO_LOG` diagnostic.
+- `runtime/gpu/shaders.cpp`, `shaders.h`, `d3d12.cpp`, `render_thread.cpp`: fixed function vertex blending
+  (D3DRS_VERTEXBLEND 1 to 6) and the four world matrices reaching the render thread; the F3 capture
+  lists each draw's blend mode and world translations.
 - The 4361 overlay itself (`config/xdk/4361/layout.toml`, signatures still to sign).
 
 ## Next steps (M1)

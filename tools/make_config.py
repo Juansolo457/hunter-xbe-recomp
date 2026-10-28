@@ -52,6 +52,17 @@ HAND = {
     'CDirectSoundStream_SetConeAngles': (0x215074, 'oovpa 4134; IDirectSoundStream_SetConeAngles 0x21557A jumps to it'),
     'CDirectSoundStream_SetConeOrientation': (0x2150CE, 'oovpa 4134 (ret 0x14)'),
     'CDirectSoundStream_SetConeOutsideVolume': (0x215139, 'oovpa 4134 (ret 0xC)'),
+    'IDirectSound_CreateSoundStream': (0x215F2E, 'by hand: wrapper (this - 8, ret 0x10) of '
+                                                 'CDirectSound_CreateSoundStream 0x215CEF; the DSOUND synth 0x21FC0D '
+                                                 'calls it'),
+    'CDirectSoundStream_SetMaxDistance': (0x21518F, 'by hand: IDirectSoundStream_SetMaxDistance 0x2155AD calls it '
+                                                    '(ret 0xC), it calls CDirectSoundVoice_SetMaxDistance 0x2148EB'),
+    'CDirectSoundStream_SetMinDistance': (0x2151E9, 'by hand: IDirectSoundStream_SetMinDistance 0x2155C5 calls it '
+                                                    '(ret 0xC), it calls 0x21491E as the buffer\'s SetMinDistance does'),
+    'CDirectSoundStream_SetMode': (0x215243, 'by hand: IDirectSoundStream_SetMode 0x2155DD jumps to it (ret 0xC), it '
+                                             'calls 0x214951 as the buffer\'s SetMode does'),
+    'CDirectSoundStream_SetMixBinVolumes': (0x2140EA, 'by hand: IDirectSoundStream_SetMixBinVolumes 0x2143A9 jumps to '
+                                                      'it (ret 8), it calls 0x2133BE as the buffer\'s does'),
     'XInputGetCapabilities': (0, 'xbe_symbols matched 0x25DB04 by constants (0.60); that code claims a '
                                  'device slot and counts opens, XInputOpen\'s job (XInputOpen is 0x25900D)'),
 }

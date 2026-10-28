@@ -46,10 +46,10 @@ CDirectSoundStream_SetFormat                         = 0x214F28  # oovpa 4134
 CDirectSoundStream_SetFrequency                      = 0x214F7A  # oovpa 4134
 CDirectSoundStream_SetHeadroom                       = 0x214046  # oovpa 4134
 CDirectSoundStream_SetI3DL2Source                    = 0
-CDirectSoundStream_SetMaxDistance                    = 0
-CDirectSoundStream_SetMinDistance                    = 0
+CDirectSoundStream_SetMaxDistance                    = 0x21518F  # by hand: IDirectSoundStream_SetMaxDistance 0x2155AD calls it (ret 0xC), it calls CDirectSoundVoice_SetMaxDistance 0x2148EB
+CDirectSoundStream_SetMinDistance                    = 0x2151E9  # by hand: IDirectSoundStream_SetMinDistance 0x2155C5 calls it (ret 0xC), it calls 0x21491E as the buffer's SetMinDistance does
 CDirectSoundStream_SetMixBins                        = 0x214098  # oovpa 4134
-CDirectSoundStream_SetMixBinVolumes                  = 0
+CDirectSoundStream_SetMixBinVolumes                  = 0x2140EA  # by hand: IDirectSoundStream_SetMixBinVolumes 0x2143A9 jumps to it (ret 8), it calls 0x2133BE as the buffer's does
 CDirectSoundStream_SetPosition                       = 0x215299  # oovpa 4134
 CDirectSoundStream_SetVelocity                       = 0x215304  # oovpa 4134
 CDirectSoundStream_SetVolume                         = 0x213EFE  # sig, oovpa 4134
@@ -288,6 +288,8 @@ CDirectSoundStream_SetAllParameters                  = 0x21501E  # oovpa 4134; I
 CDirectSoundStream_SetConeAngles                     = 0x215074  # oovpa 4134; IDirectSoundStream_SetConeAngles 0x21557A jumps to it
 CDirectSoundStream_SetConeOrientation                = 0x2150CE  # oovpa 4134 (ret 0x14)
 CDirectSoundStream_SetConeOutsideVolume              = 0x215139  # oovpa 4134 (ret 0xC)
+IDirectSound_CreateSoundStream                       = 0x215F2E  # by hand: wrapper (this - 8, ret 0x10) of CDirectSound_CreateSoundStream 0x215CEF; the DSOUND synth 0x21FC0D calls it
+CDirectSoundStream_SetMode                           = 0x215243  # by hand: IDirectSoundStream_SetMode 0x2155DD jumps to it (ret 0xC), it calls 0x214951 as the buffer's SetMode does
 
 [data]
 D3D_DeferredTextureState    = 0x20FC30  # D3DDevice_SetTextureStageStateNotInline 0x20153C and 0x20159B store [(stage * 32 + type) * 4 + it]
