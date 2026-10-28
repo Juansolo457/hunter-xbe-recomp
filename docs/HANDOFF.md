@@ -18,8 +18,9 @@ The first session (2026-10-27) started Linux-first; the user corrected the order
 after an internet outage mixed up two sessions. The docs follow the corrected order.
 
 ## Where it stands
-**M1 in progress: the game boots on Windows, plays its intro movies with sound and reaches the
-main menu (the user saw the splash screens and the menu, 2026-10-28). Untested past the menu.**
+**M1 in progress: the game boots on Windows and plays: menus, a new game, moving around, characters
+rendered correctly, smooth (user, 2026-10-28). Only ambient sound plays in game: weapon and enemy
+sounds are silent (step 12 has the cause). Testing is paused while the user works on F.E.A.R.**
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
   Open, stacked: PR #1 `bootstrap`, PR #2 `m0-first-build` (the first build), and the `m1-boot`
   PR (this boot work). CodeRabbit is not installed yet: merge in order once the user has reviewed.
@@ -75,10 +76,17 @@ Each stop, its cause and the fix, in order:
     only (an in-game F3 capture showed w1 all zeros). Both fixed in the SDK (vertex blending in
     `gpu/shaders.cpp` with world 1 to 3 constants filled in `gpu/d3d12.cpp`; the render thread copies
     the four world matrices). The user confirmed the characters are right.
-12. Weapon and enemy sounds are silent while ambience plays: still open. `IDirectSound_CreateSoundStream`
-    and the stream SetMode, SetMaxDistance, SetMinDistance, SetMixBinVolumes were added on the way (the
-    library synth calls them) but did not fix it. `XBE_AUDIO_LOG=1` logs each voice's first plays
-    (format, 3D, distance, attenuation, volume, bins) at the level release builds keep.
+12. Weapon and enemy sounds are silent while ambience plays: **open, next up.** The `XBE_AUDIO_LOG` run
+    (user, 2026-10-28, 7.8 min in game firing and meeting enemies) logged about 30 voices, none 3D,
+    and no weapon or enemy sound ever reached the runtime's Play. Among them, four looping 48 kHz
+    PCM buffers routed to mix bins 0+1, 2, 3 and 4+5: the DirectMusic software synth's sink (the
+    game's "Atlas Sound DM" layer plays its effects through DirectMusic). The synth refills those
+    buffers on **SetNotificationPositions** events, which the runtime accepts but never signals
+    (step 10), so everything DirectMusic plays is silent. Fix: keep each buffer's notification
+    offsets and events (DSBPOSITIONNOTIFY pairs) and signal an event when the play cursor crosses
+    its offset in the mixer (and on stop for DSBPN_OFFSETSTOP), in `sdk/runtime/xdk/dsound.cpp`.
+    `IDirectSound_CreateSoundStream` and the stream SetMode, SetMaxDistance, SetMinDistance,
+    SetMixBinVolumes were added on the way (the synth calls them).
 
 ## SDK changes to offer upstream (TGP482/XboxXBE-Recomp)
 `sdk/` was unchanged until this work; every change here is portable and game-agnostic:
