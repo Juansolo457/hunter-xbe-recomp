@@ -1,7 +1,8 @@
 # Recompiler input for default.xbe. build.bat / build.sh replace this with the config xbe_symbols writes:
 #   xbe_symbols assets/default.xbe sdk/xdk --library Hunter.dll --out config/game.toml
-# xbe_symbols needs sdk/xdk/4361/signatures.toml, which does not exist yet: Hunter is built on XDK 4361
-# (docs/FINDINGS.md) and the SDK ships 4831 and 5849. Making 4361 is milestone M0 in docs/PLAN.md.
+# xbe_symbols needs 4361 signatures, which do not exist yet: Hunter is built on XDK 4361
+# (docs/FINDINGS.md) and the SDK ships 4831 and 5849. They go in the overlay config/xdk/4361/
+# (milestone M0 in docs/PLAN.md).
 # Names left at 0 become trapping stubs; find them in Ghidra
 # (python sdk/tools/symbols/xbe2pe.py config/game.toml hunter.exe) and fill them in by hand.
 [xbe]

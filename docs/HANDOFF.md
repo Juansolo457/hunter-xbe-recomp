@@ -1,87 +1,73 @@
-# Handoff: Hunter: The Reckoning (original Xbox) (2026-10-27)
+# Handoff: Hunter: The Reckoning (original Xbox) (2026-10-28)
 
 State file. The next model starts here, not from chat history. Update it at the end of every
-session. Goals and milestones: [PLAN.md](PLAN.md). Disc and XBE facts: [FINDINGS.md](FINDINGS.md).
+session. Goals, decisions and milestones: [PLAN.md](PLAN.md). Disc and XBE facts:
+[FINDINGS.md](FINDINGS.md).
 
-## The ask (the user, 2026-10-27)
+## The ask (the user)
 Static recompilation of **Hunter: The Reckoning** (Xbox, USA) in the shape of
-https://github.com/TGP482/007FRWL-XBERecomp, built on TGP482's **XboxXBE-Recomp** SDK, which is
-the standard to hit. **Linux first (Steam Deck first), with Vulkan.** Windows/PC later; D3D12
-for PC maybe later. Follow the SDK's `templates/game` layout. Pull requests reviewed by
-CodeRabbit (the user hooks the GitHub app up). Same house rules as the sibling recomps
-(`../quake4-360-recomp/AGENTS.md`, `CONTRIBUTING.md`): master protected, PR + `audit` check +
-up to date + threads resolved, admins too; source-only releases; never commit game data;
-commit as `juansolo457 <5344231+Juansolo457@users.noreply.github.com>`; builds and game
-windows need the user's OK first.
+https://github.com/TGP482/007FRWL-XBERecomp, on TGP482's **XboxXBE-Recomp** SDK, the standard to
+hit. Order, as with GRAW: **Windows D3D12 first** with the SDK as it ships, then the **Steam
+Deck through Proton**, then **native Linux with Vulkan**. Pull requests reviewed by CodeRabbit
+(the user installs the GitHub app). House rules as in the sibling recomps: master protected,
+source-only releases, never commit game data, commit as
+`juansolo457 <5344231+Juansolo457@users.noreply.github.com>`. Builds and test windows are free in
+this repo; never close a game the user is running.
+
+The first session (2026-10-27) started Linux-first; the user corrected the order on 2026-10-28
+after an internet outage mixed up two sessions. The docs now follow the corrected order.
 
 ## Where it stands
-**M0 started: the local repository is ready; it is not on GitHub yet and nothing is built.**
-- Local git: `master` holds only the repo basics and the audit (commit `7f1064d`). Everything
-  else is on the local branch `bootstrap`. Creating the public GitHub repo was blocked as an
-  outward-facing action pending the user's OK. Once given:
-  `gh repo create Juansolo457/hunter-xbox-recomp --public --source . --remote origin`, push
-  `master` only, apply the master lock (below), then push `bootstrap` and open its pull request
-  for CodeRabbit (the user installs the CodeRabbit app on the repo).
-- `sdk/`: XboxXBE-Recomp at `91146ff` (2026-10-27, 0.1.0, MIT), vendored, pinned in `sdk.toml`,
-  without its `.github`. No changes to it yet.
+**M0 started: the repository is up; nothing has been built.**
+- https://github.com/Juansolo457/hunter-xbe-recomp (public). `master` holds the repo basics
+  and the audit and is locked (below). Everything else comes in through the `bootstrap` pull
+  request, which waits for CodeRabbit and the user.
+- `sdk/`: XboxXBE-Recomp at `91146ff` (2026-10-27, 0.1.0, MIT), unchanged, pinned in
+  `sdk.toml`, without its `.github`.
 - Template files from the SDK's `templates/game`, renamed for Hunter (`Hunter.exe`,
   `Hunter.dll`, `project(hunter)`). Issue templates from the 007 port.
 - `config/game.toml`: placeholder with Hunter's `[xbe]` header (title, entry, xdk 4361, code
-  sections). `src/common/game_info.cpp` filled in. `src/game/hooks.cpp` defines `DbgPrint`
-  (ordinal 8), the one kernel import the SDK lacks.
-- `build.sh` checks the XBE and stops at the first stage that doesn't exist yet.
-- Tools tested on the real disc: `xiso.py` (list / extract all or some), `xbeinfo.py`,
-  `xbeimports.py` (123 imports, 0 missing with hooks.cpp). `audit_repo.py` adapted to this repo
-  (XBEH and RIFF magic, `assets/`, `generated/`, the `X86_FUNC(__imp__sub_...)` pattern
-  xbe_recomp writes); `test_audit_repo.py` 6 cases pass.
-- `.coderabbit.yaml`: assertive profile, path instructions for `sdk/`, `src/`, `config/`,
-  `tools/`, `docs/`; `generated/`, `assets/`, `private/`, `out/` filtered out. CodeRabbit only
-  reviews once the user installs the GitHub app on this repository.
+  sections). `config/xdk/4361/` holds only a README so far. `src/common/game_info.cpp` filled
+  in. `src/game/hooks.cpp` defines `DbgPrint` (ordinal 8), the one kernel import the SDK lacks.
+- Tools tested on the real disc: `xiso.py` (list, extract all or some), `xbeinfo.py`,
+  `xbeimports.py` (123 imports, 0 missing with hooks.cpp). `audit_repo.py` adapted to this repo;
+  `test_audit_repo.py`, 6 cases, pass.
+- `build.sh` is a stub until M5.
 
-## Next steps (M0, PLAN.md)
-1. **XDK 4361 support**, with no build needed for the first part:
-   - Make Hunter's `config/game.toml` by hand: for each name in
-     `sdk/xdk/4831/signatures.toml` `[symbols]` and `[data]`, find it in Hunter (Ghidra or REA on
-     `E:\OG-xbox-recomps\hunter-xbe\default.xbe`; library code lives in the `D3D`, `DSOUND`,
-     `XGRPH`, `D3DX`, `XPP` sections, XAPI and CRT in `.text`), or leave it at 0 when the game
-     doesn't link it. Comment each address with how it was proven. TGP482's 007 config is the
-     model for a complete one.
-   - `sdk/xdk/4361/layout.toml`: the 52 keys of the 4831 file, each proven at an address in
-     Hunter's code (same method, same comments).
-   - Then `xbe_symbols --sign config/game.toml --out sdk/xdk/4361/signatures.toml`
-     (needs the tool built: step 2).
-2. **The SDK tools on Linux** (needs the user's OK to build): `xbe_symbols` and `xbe_recomp`
-   in WSL2. `cmake/XbeRecomp.cmake` is Windows-only (lld-link, .def files, WIN32 exe); split it
-   so the tools and the code DLL/shared object build on Linux. Upstreamable.
-3. First recompile, then the recompiled code compiling under clang on Linux.
+## Next steps (M0)
+1. **Make Hunter's `config/game.toml` by hand.** For each name in
+   `sdk/xdk/4831/signatures.toml` `[symbols]` and `[data]`, find it in Hunter (Ghidra or REA on
+   `E:\OG-xbox-recomps\hunter-xbe\default.xbe`; library code lives in the `D3D`, `DSOUND`,
+   `XGRPH`, `D3DX`, `XPP` sections, XAPI and the CRT in `.text`), or leave it at 0 when the game
+   doesn't link it. Comment each address with how it was proven. TGP482's 007 config is the
+   model for a complete one.
+2. **`config/xdk/4361/layout.toml`**: the 52 keys of the 4831 file, each proven at an address in
+   Hunter's code, with the same comment style.
+3. **Wire the overlay in.** `build.bat` passes `%SDK%\xdk` to `xbe_symbols`, and
+   `add_xbe_image` in `sdk/cmake/XbeRecomp.cmake` passes `${XBE_SDK_DIR}/xdk` to `xbe_recomp`.
+   Point both at a folder holding the SDK's builds plus `config/xdk/4361`, from this repo's
+   `CMakeLists.txt` and `build.bat`, with `sdk/` unchanged (for example, copy both into
+   `out/build/release/xdk` at configure time). Then sign:
+   `xbe_symbols --sign config/game.toml --out config/xdk/4361/signatures.toml`.
+4. **First build** with `build.bat` (VS 2022 Clang + CMake are installed): recompile, compile,
+   link `Hunter.exe`.
 
-## Facts found
-In [FINDINGS.md](FINDINGS.md). Local paths not recorded there:
-- The disc image: `E:\OG-xbox-recomps\Hunter - The Reckoning (USA).xiso.iso`, and the
-  extracted `E:\OG-xbox-recomps\hunter-xbe\default.xbe`. Read-only; never commit them.
-- SDK portability: the runtime (kernel, xdk, cpu, gpu shader/vertex/texture code) already
-  compiles on Linux through `sdk/harness` (headless, no GPU). Windows-only: `runtime/app/*`,
-  `gpu/d3d12.cpp`, `audio/xaudio2.cpp`, the ImGui win32/dx12 backends; `core/input.cpp` is SDL3.
-  The recompiler and `xbe_symbols` sources have no Windows dependencies. Shaders are generated
-  as HLSL (`gpu/shaders.cpp`); a Vulkan backend implements `gpu::Backend` (`gpu/backend.h`) and
-  compiles that HLSL to SPIR-V. `gpu/ext.h` is D3D12-typed (unused by Hunter so far).
-- Toolchains on this PC: VS 2022 Clang + CMake (`build.bat` finds them); WSL2 Ubuntu with
-  clang 21.1.8, cmake 4.2.3, ninja, glslc, Vulkan headers, 16 threads.
+## Local paths (not in FINDINGS.md)
+- The disc image: `E:\OG-xbox-recomps\Hunter - The Reckoning (USA).xiso.iso`; the extracted
+  `E:\OG-xbox-recomps\hunter-xbe\default.xbe`. Read-only; never commit them. Extract into
+  `assets/` with `python -I tools/xiso.py <iso> extract assets` before the first build.
+- For M5 later: the SDK runtime's kernel, XDK and gpu shader code already compile on Linux
+  through `sdk/harness` (headless). Windows-only are `runtime/app/*`, `gpu/d3d12.cpp`,
+  `audio/xaudio2.cpp` and the ImGui win32/dx12 backends; `cmake/XbeRecomp.cmake` uses lld-link
+  and .def files.
 
 ## Steam Deck
-The user (2026-10-27): do not set up or test the Deck SSH path until a first build is ready to be
-played. Until then everything runs on this PC (WSL2 for Linux builds). Deck details are in memory
-`steam-deck-ssh` when that time comes.
+Do not set up or test the Deck SSH path until a first build is ready to be played. Deck details
+are in memory `steam-deck-ssh` when that time comes; the Deck runs the Windows build in Proton.
 
 ## Master lock (day 1, non-negotiable)
-Right after the first push: `gh api -X PUT repos/Juansolo457/hunter-xbox-recomp/branches/master/protection`
-with `required_status_checks: {strict: true, contexts: ["audit"]}`, `enforce_admins: true`,
-`required_pull_request_reviews: {required_approving_review_count: 0}`,
-`required_conversation_resolution: true`, `allow_force_pushes: false`, `allow_deletions: false`,
-`restrictions: null`. Every later change, the bootstrap included, goes in through a pull request.
-
-## Decisions taken as defaults (the user may change them)
-1. Repo name `hunter-xbox-recomp` (sibling naming), public like the other recomps.
-2. The SDK vendored as a copy in `sdk/`, changes offered upstream with `sdk/tools/sdk_sync`; no
-   fork yet.
-3. No build until the user OKs one (step 2 above is the first).
+Applied right after the first push: `required_status_checks: {strict: true, contexts:
+["audit"]}`, `enforce_admins: true`, `required_pull_request_reviews:
+{required_approving_review_count: 0}`, `required_conversation_resolution: true`,
+`allow_force_pushes: false`, `allow_deletions: false`, `restrictions: null`. Every later change,
+the bootstrap included, goes in through a pull request.

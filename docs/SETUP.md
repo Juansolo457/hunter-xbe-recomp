@@ -12,7 +12,7 @@ same disc. You need **Hunter: The Reckoning (USA)** for the original Xbox.
 Dump your disc to an ISO, then extract it into `assets/`:
 
 ```
-python -I tools/xiso.py "<your disc>.iso" assets
+python -I tools/xiso.py "<your disc>.iso" extract assets
 ```
 
 This writes the whole disc into `assets/`: `default.xbe` and the `Media` folder beside it
@@ -24,11 +24,16 @@ python -I tools/xbeinfo.py assets/default.xbe
 
 It must print SHA-1 `39735b530002b4e2da4182042591ef6e68ee08a0`.
 
-## 2. Build
+## 2. Build (Windows)
 
-**Linux (the target, Steam Deck first):** clang, CMake, Ninja, the Vulkan headers and loader,
-SDL3's build dependencies, then `./build.sh`. Not working yet: see PLAN.md for the milestones.
+Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) with **Desktop
+development with C++**, **C++ Clang tools for Windows** and **C++ CMake tools for Windows**
+(`build.bat` offers to add the last two), then run `build.bat`. The first build recompiles the
+game and takes a while. The exe is written to `out\build\release\Hunter.exe`.
 
-**Windows (the SDK as shipped, Direct3D 12):** Visual Studio 2022 with Desktop development with
-C++, C++ Clang tools and C++ CMake tools, then `build.bat`. It stops until XDK 4361 support
-lands (M0).
+It stops until XDK 4361 support lands (M0 in [PLAN.md](PLAN.md)).
+
+## Steam Deck and Linux
+
+The Deck runs the Windows build through Proton first. A native Linux build with Vulkan comes
+last (M5 in [PLAN.md](PLAN.md)).

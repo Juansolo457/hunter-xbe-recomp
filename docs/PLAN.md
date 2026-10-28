@@ -1,31 +1,29 @@
 # Plan: Hunter: The Reckoning (original Xbox), statically recompiled
 
-Written 2026-10-27 from the user's brief. State and next steps: [HANDOFF.md](HANDOFF.md); disc and
-XBE facts: [FINDINGS.md](FINDINGS.md).
+Written 2026-10-27/28 from the user's brief and plan review. State and next steps:
+[HANDOFF.md](HANDOFF.md); disc and XBE facts: [FINDINGS.md](FINDINGS.md).
 
 ## Goal
 The Xbox Hunter: The Reckoning running natively, its x86 code translated to C++ with TGP482's
 [XboxXBE-Recomp](https://github.com/TGP482/XboxXBE-Recomp) SDK, to the standard of
-[007FRWL-XBERecomp](https://github.com/TGP482/007FRWL-XBERecomp): resolution, frame rate,
-anti-aliasing, field of view, mouse and keyboard, rebinding, gyro, texture replacement.
+[007FRWL-XBERecomp](https://github.com/TGP482/007FRWL-XBERecomp).
 
-Platforms, in order:
-1. **Linux, the Steam Deck first**, drawn with **Vulkan**. The first bar: the whole game at a
-   locked frame rate on the Deck.
-2. **Windows / PC**, with the same Vulkan renderer.
-3. **Direct3D 12 on PC, maybe later**: the SDK's own renderer, if it earns its keep.
-
-## Decisions (the user, 2026-10-27)
-- **The SDK and the 007 port are the template**: the SDK's `templates/game` layout, `sdk/` in
-  the repo, `config/game.toml`, `src/common` and `src/game`.
-- **Linux first, Vulkan.** The SDK draws with Direct3D 12 and runs only on Windows today (its
-  headless harness aside). The Linux layers are added to `sdk/` and offered upstream.
-- **CodeRabbit reviews every pull request**; `master` is protected like the sibling recomps.
+## Decisions (the user)
+- **The 007 port and the SDK template are reused unchanged first.** The SDK's
+  `templates/game` layout, `sdk/` in the repo, `config/game.toml`, `src/common`, `src/game`.
+- **Order, as with GRAW:**
+  1. **Windows, Direct3D 12**, the SDK as it ships.
+  2. **Steam Deck through Proton**: the Windows build, built on the PC and pushed over SSH.
+  3. **Native Linux with Vulkan** last.
+- **XDK 4361 as an overlay** in this repo (`config/xdk/4361/`): layout and signatures made by
+  hand for Hunter, offered upstream as a pull request once complete. No SDK fork before the
+  Linux phase.
+- **0.1 is the game playing through.** 007's mouse and keyboard, texture replacement, HDR and
+  draw distance are 1.0 features.
+- **CodeRabbit reviews every pull request**; `master` is locked like the other recomps.
 - **Source only.** No release ships the game's code; players build from their own disc.
-
-Defaults taken without the user (change by asking): repository name `hunter-xbox-recomp`, the
-SDK vendored as a copy (`sdk.toml` pin) rather than a fork or submodule, game code linked at
-build time on Linux (the SDK's first-launch compile stays a Windows feature for now).
+- **Builds and test windows are free in this repo** while debugging; never close the user's
+  running game.
 
 ## Architecture
 ```
@@ -33,23 +31,19 @@ assets/default.xbe --xbe_symbols--> config/game.toml (XDK functions and data the
                    --xbe_recomp----> generated/game (C++, one function per guest function)
                                           |
 src/          game info, options, hooks over recompiled functions (X86_FUNC)
-sdk/runtime   kernel, XDK HLE (D3D8, DirectSound, XAPI), cpu dispatch, gpu state and shaders
-  Windows:    app (Win32), gpu/d3d12.cpp, audio/xaudio2.cpp  (as shipped)
-  Linux:      app over SDL3, gpu/vulkan.cpp, audio over SDL3  (this project)
+sdk/runtime   kernel, XDK HLE (D3D8, DirectSound, XAPI), D3D12 renderer, XAudio2, SDL3 pads
+config/xdk/4361   the XDK layout and signatures the SDK lacks for this build
 ```
-The SDK's renderer translates the Xbox's vertex programs, combiners and fixed function state to
-HLSL (`gpu/shaders.cpp`). The Vulkan backend compiles that HLSL to SPIR-V (DXC as a library, a
-pipeline cache on disk), so one shader translator serves both APIs.
 
 ## Milestones
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | **Repo and XDK 4361** | Repo public and protected; `config/game.toml` complete for Hunter (every symbol `xbe_symbols` reads for 4831 found in Hunter, or proven absent); `sdk/xdk/4361/layout.toml` with each key proven in Hunter's code; `sdk/xdk/4361/signatures.toml` signed from it; `xbe_symbols` and `xbe_recomp` build and run on Linux; the recompiled code compiles |
-| M1 | **Headless boot on Linux** | `sdk/harness` runs Hunter in WSL/Linux: kernel and XDK calls hold, the title reaches its front end menu, reference-renderer captures show it |
-| M2 | **Vulkan and the Linux app** | SDL3 window and pads, SDL3 audio, `gpu::Backend` on Vulkan; menus and the first level drawn correctly on desktop Linux |
-| M3 | **Steam Deck** | A Deck build in `~/recomps/Hunter-SteamDeck/`; the user plays it through, locked frame rate, logs collected |
-| M4 | **007 parity options** | Display, graphics, input and general options the 007 port has, that make sense for Hunter |
-| M5 | **Windows** | The same Vulkan path on Windows; the D3D12 question decided |
+| M0 | **XDK 4361 and the first build** | `config/xdk/4361/layout.toml` with every key proven in Hunter's code; `config/game.toml` complete (every symbol the 4831 set names found in Hunter or proven absent); signatures signed from it; the overlay wired into the build; `Hunter.exe` links |
+| M1 | **Boot on Windows** | The title reaches its front end menu; kernel and XDK gaps (DirectMusic, WMA, Dolby sections, Bink) handled |
+| M2 | **Playable on Windows (0.1)** | The game plays through: levels, saves, co-op on one PC |
+| M3 | **Steam Deck through Proton** | A push-over-SSH helper; the user plays on the Deck; Deck issues fixed in the Windows build |
+| M4 | **007 parity (1.0)** | Mouse and keyboard, texture replacement, HDR, draw distance and the other 007 options that suit Hunter |
+| M5 | **Native Linux** | SDK fork; Vulkan backend behind `gpu::Backend` (raw Vulkan + VMA, HLSL to SPIR-V with DXC), SDL3 app and audio; native on the Deck |
 
 ## Risks
 - **XDK 4361 is older than anything the SDK supports.** D3D8 structure offsets, render state
@@ -57,5 +51,4 @@ pipeline cache on disk), so one shader translator serves both APIs.
   Hunter's code, not assumed.
 - **Libraries the SDK hasn't met:** DirectMusic (linked, use unproven), the WMA decoder and the
   Dolby encoder sections, Bink inside `.text`. Each needs HLE or must be proven harmless.
-- **The SDK is young (0.1.0) and Windows-shaped.** Linux changes touch many files; keep them
-  small and upstreamable so syncing stays possible.
+- **The SDK is young (0.1.0).** Keep `sdk/` unchanged so upstream updates drop in.
