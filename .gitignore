@@ -1,0 +1,53 @@
+# What must never be committed: anything from the game (its disc, XBE, extracted files, the
+# translation of its code, logs and captures) and anything built from it. tools/audit_repo.py
+# checks what is tracked and staged; CI runs it on every push (README.md, "Legal").
+
+# --- The game: your disc and everything extracted or captured from it ---
+/assets/
+/private/
+*.iso
+*.xbe
+*.xiso
+*.7z
+*.zip
+*.rar
+*.JAM
+*.jam
+*.bik
+*.wma
+*.xbx
+
+# --- The recompiled game code, derived from your XBE ---
+/generated/
+
+# --- Build output and programs built from the game's code ---
+/out/
+/build/
+*.exe
+*.dll
+*.so
+*.lib
+*.obj
+*.o
+*.pdb
+*.ilk
+*.dmp
+
+# --- Runtime files beside the executable ---
+settings.toml
+/logs/
+/hdd/
+/cap/
+/CrashDumps/
+/textures/
+
+# --- Editors / OS ---
+.vs/
+.vscode/
+.idea/
+__pycache__/
+.local
+Thumbs.db
+.DS_Store
+.claude/settings.local.json
+.env

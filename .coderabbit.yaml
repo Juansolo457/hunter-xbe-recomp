@@ -1,0 +1,53 @@
+# CodeRabbit reviews every pull request into master (CONTRIBUTING.md). Review threads must be
+# resolved before a merge, so keep the noise useful: the SDK copy is reviewed for portability,
+# the game code for guest/host correctness, the tools for what they may let through.
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+early_access: false
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - master
+  path_filters:
+    - "!generated/**"
+    - "!assets/**"
+    - "!private/**"
+    - "!out/**"
+  path_instructions:
+    - path: "sdk/**"
+      instructions: >
+        This is a vendored copy of TGP482's XboxXBE-Recomp SDK (MIT) with this project's Linux
+        and Vulkan changes made in place, intended to go back upstream. Flag anything that would
+        break the Windows build, anything Windows-only added to a shared file without a Linux
+        path, and anything game-specific that belongs in src/ instead. Thread safety matters:
+        the game runs its own threads through the kernel layer, and the renderer has a thread of
+        its own.
+    - path: "src/**"
+      instructions: >
+        Host code and hooks over recompiled x86 guest code. Check guest pointer handling
+        (kernel::HostPtr, 32-bit addresses), calling conventions on X86_FUNC overrides, and that
+        nothing from the game (data, strings, addresses dumped from tools) is pasted in beyond
+        the addresses a hook needs. Both Windows and Linux must build.
+    - path: "config/**"
+      instructions: >
+        Recompiler config: every address should have a comment saying where it was proven.
+        Nothing here may contain game bytes.
+    - path: "tools/**"
+      instructions: >
+        Python scripts run with python -I against untrusted game files; audit_repo.py and its
+        tests guard what reaches the repository. Treat loosening a rule there as a security
+        review.
+    - path: "docs/**"
+      instructions: >
+        Keep claims consistent with HANDOFF.md and FINDINGS.md; flag stale facts and promises of
+        binaries or game files (releases are source only).
+chat:
+  auto_reply: true
