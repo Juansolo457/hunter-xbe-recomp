@@ -15,10 +15,13 @@ commit as `juansolo457 <5344231+Juansolo457@users.noreply.github.com>`; builds a
 windows need the user's OK first.
 
 ## Where it stands
-**M0 started: the repository exists; nothing has been built.**
-- GitHub: https://github.com/Juansolo457/hunter-xbox-recomp (public). `master` holds only the
-  repo basics and the audit (first commit), and is locked (below). Everything else came in
-  through the `bootstrap` pull request, which waits for CodeRabbit and the user.
+**M0 started: the local repository is ready; it is not on GitHub yet and nothing is built.**
+- Local git: `master` holds only the repo basics and the audit (commit `7f1064d`). Everything
+  else is on the local branch `bootstrap`. Creating the public GitHub repo was blocked as an
+  outward-facing action pending the user's OK. Once given:
+  `gh repo create Juansolo457/hunter-xbox-recomp --public --source . --remote origin`, push
+  `master` only, apply the master lock (below), then push `bootstrap` and open its pull request
+  for CodeRabbit (the user installs the CodeRabbit app on the repo).
 - `sdk/`: XboxXBE-Recomp at `91146ff` (2026-10-27, 0.1.0, MIT), vendored, pinned in `sdk.toml`,
   without its `.github`. No changes to it yet.
 - Template files from the SDK's `templates/game`, renamed for Hunter (`Hunter.exe`,
