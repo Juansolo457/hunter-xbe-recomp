@@ -24,9 +24,9 @@ clock, step 12): fixed and confirmed by the user 2026-10-29. No known bugs in wh
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
   Everything so far came in through three stacked PRs, merged in order at the user's request
   (2026-10-29): #1 `bootstrap`, #2 `m0-first-build` (the first build), #3 `m1-boot` (this boot
-  work). CodeRabbit reviews PRs; its 11 threads on #1 were fixed or answered before the merge.
-- `config/game.toml`: 138 of 253 XDK functions and 11 of 13 data addresses, each labelled with where it
-  came from (`tools/make_config.py` writes it; FINDINGS.md). 113 names are at 0: 37 are
+  work). CodeRabbit reviews PRs; each PR's threads were fixed or answered before its merge.
+- `config/game.toml`: 156 of 268 XDK functions and 11 of 13 data addresses, each labelled with where it
+  came from (`tools/make_config.py` writes it; FINDINGS.md). 112 names are at 0: 37 are
   networking names Hunter doesn't link, the rest not found or not called yet.
 - `config/xdk/4361/layout.toml`: 44 keys, each proven at an address in Hunter's code, including
   the render state numbering (below).
@@ -149,8 +149,8 @@ out\build\release\Hunter.exe                 # finds assets/ in a folder above i
 | `tools/xiso.py <iso> list \| extract <dir> [paths]` | XDVDFS reader |
 | `tools/xbeinfo.py <xbe>` | header, sections, XDK builds (entry key fixed: entry is `0xA27C1`) |
 | `tools/xbeimports.py <xbe>` | kernel imports against the SDK and `src/` |
-| `tools/oovpa_scan.py <XbSymbolDatabase checkout> <xbe> 4361 [seeds]` | XbSymbolDatabase patterns matched as data; checkout outside the repo |
-| `tools/xbedis.py <xbe> <addr or name> [n]` | capstone disassembly naming known addresses (needs capstone; run without `-I`) |
+| `tools/oovpa_scan.py <XbSymbolDatabase checkout> <xbe> 4361 [--seed X=0x..] [--seed-file f]` | XbSymbolDatabase patterns matched as data; checkout outside the repo |
+| `tools/xbedis.py <xbe> <addr or name> [n]` | capstone disassembly naming known addresses (capstone in a virtual environment, run with its interpreter and `-I`) |
 | `out/build/release/xbe_symbols.exe` | the SDK's scanner; with the 4831 set copied as `<tmp>/4361` it gives the "sig"/"k=" finds |
 
 ## Local paths (not in FINDINGS.md)

@@ -34,18 +34,22 @@ XAPILIB build, so it stops on this XBE. See PLAN.md, M0.
    6 of 13 data. 15 of those matched by constants only; each is labelled with its score.
 2. XbSymbolDatabase's OOVPA patterns (MIT code, ODbL database, not vendored) read as data by a
    Python matcher that mirrors the library's automatic scan; run outside the repo. It agrees with
-   `xbe_symbols` on all 46 functions both found, and adds 60. Seeding it with the device pointer
-   and the step 1 results added 12 more.
+   `xbe_symbols` on all 46 functions both found, and adds 60, 12 of which it found only once
+   seeded with the device pointer and the step 1 results. (Since then the matcher also tests
+   overlapping offsets, as the library does; that adds five `IDirectSoundStream_*` jump stubs
+   into `CDirectSoundStream_*` functions and changes no other match.)
 3. By hand: `XInputGetCapabilities` dropped (the constants match at `0x25DB04` is device-open
    code; `XInputOpen` is `0x25900D`); `D3D_pDevice` `0x212E70` and `D3D_DirtyFlags` `0x20FC28`
    read from the D3D code.
 
-Result after M0: 129 of 248 functions, 8 of 13 data. The boot work (2026-10-28, HANDOFF.md) added
-nine functions and three data addresses read from the code, five of them names the SDK's list
-lacked, and set `IDirectSoundBuffer_SetRolloffCurve` back to 0: the SDK's byte signature matched
-the SetConeAngles wrapper (thin wrappers differ only in their masked call target, so a signature
-alone can't tell them apart; check the callee). Now 138 of 253 functions, 11 of 13 data; 37 of
-the names at 0 are networking and Xbox Live (Hunter links no XNET library).
+Result after M0: 129 of 248 functions (69 from step 1 after step 3's drop, 60 from step 2), 8 of
+13 data, 119 at 0. The boot work (2026-10-28 and 29, HANDOFF.md) added 28 functions and three data
+addresses by hand, each with its proof: 20 are names the SDK's list lacked (mostly the DirectSound
+methods the runtime now replaces), 8 were at 0. It set `IDirectSoundBuffer_SetRolloffCurve` back
+to 0: the SDK's byte signature matched the SetConeAngles wrapper (thin wrappers differ only in their
+masked call target, so a signature alone can't tell them apart; check the callee). Now 156 of 268
+functions, 11 of 13 data; of the 112 at 0, 37 are networking and Xbox Live (Hunter links no XNET
+library), the rest not found yet or not called.
 
 ### Render state numbering
 4361 has 146 render states where 4831 has 166: no DepthClipControl, StippleEnable,

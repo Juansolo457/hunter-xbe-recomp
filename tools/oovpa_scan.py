@@ -1,10 +1,11 @@
 """Scan an XBE with XbSymbolDatabase's OOVPA patterns, read as data (no code from it runs).
 
     git clone https://github.com/Cxbx-Reloaded/XbSymbolDatabase <somewhere outside this repo>
-    python -I tools/oovpa_scan.py <that checkout> assets/default.xbe 4361 [seeds] > oovpa.tsv
+    python -I tools/oovpa_scan.py <that checkout> assets/default.xbe 4361 \
+        [--seed XREF_NAME=0xADDR ...] [--seed-file names.tsv ...] > oovpa.tsv
 
 The database is MIT code with an ODbL pattern database: it is read from the checkout, never copied
-here. Seeds: XREF_NAME=0xADDR (for example XREF_D3D_g_pDevice=0x212E70), or a file of
+here. Seeds: --seed XREF_NAME=0xADDR (for example XREF_D3D_g_pDevice=0x212E70), or --seed-file with
 name<TAB>0xADDR lines. This is how config/game.toml's "oovpa <revision>" addresses were found
 (docs/FINDINGS.md).
 
@@ -14,6 +15,7 @@ at or below matches); xrefs must already be known (function addresses or derived
 xrefs read as absolute dwords; passes repeat until nothing new is found. Manual scans are not
 reproduced. Output: name, address, revision, matches, library.
 """
+import argparse
 import os
 import re
 import struct
@@ -128,28 +130,44 @@ def compile_pattern(pairs, xrefs):
     for o, v in pairs:
         want[o] = v
     rx = b''.join(re.escape(bytes([want[i]])) if i in want else b'.' for i in range(span))
-    return re.compile(rx, re.S), span
+    # a lookahead, so every offset is a candidate as in the library's byte scan: a match that
+    # fails its xref check must not hide one starting inside it
+    return re.compile(b'(?=' + rx + b')', re.S), span
+
+
+def seed(text):
+    k, sep, v = text.partition('=')
+    if not sep or not k.startswith('XREF_'):
+        raise argparse.ArgumentTypeError(f'{text!r} is not XREF_NAME=0xADDR')
+    try:
+        return k, int(v, 0)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'{v!r} is not an address') from None
 
 
 def main():
-    root, xbe_path, build = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    ap = argparse.ArgumentParser(description='Scan an XBE with XbSymbolDatabase\'s OOVPA patterns.')
+    ap.add_argument('root', help='XbSymbolDatabase checkout, outside this repo')
+    ap.add_argument('xbe')
+    ap.add_argument('build', type=int, help='XDK build, for example 4361')
+    ap.add_argument('--seed', type=seed, action='append', default=[], metavar='XREF_NAME=0xADDR')
+    ap.add_argument('--seed-file', action='append', default=[], metavar='PATH',
+                    help='name<TAB>0xADDR lines, each name tried as XREF_<name> and XREF_D3D_<name>')
+    args = ap.parse_args()
+    root, xbe_path, build = args.root, args.xbe, args.build
     db = os.path.join(root, 'src', 'OOVPADatabase')
     sections = load_xbe(xbe_path)
     lib_src = open(os.path.join(root, 'src', 'lib', 'libXbSymbolDatabase.c'), encoding='utf-8').read()
     xref = {}
     for name in re.findall(r'xref_database\[(XREF_\w+)\]\s*=\s*XREF_ADDR_DERIVE', lib_src):
         xref[name] = DERIVE
-    # seeds: XREF_NAME=0xADDR, or a seed file of name<TAB>0xADDR lines (each name tried as
-    # XREF_<name> and XREF_D3D_<name>)
-    for arg in sys.argv[4:]:
-        if '=' in arg:
-            k, v = arg.split('=', 1)
-            xref[k] = int(v, 0)
-        else:
-            for line in open(arg):
-                n, a = line.split('\t')[:2]
-                for k in ('XREF_' + n, 'XREF_D3D_' + n):
-                    xref[k] = int(a, 0)
+    for path in args.seed_file:
+        for line in open(path):
+            n, a = line.split('\t')[:2]
+            for k in ('XREF_' + n, 'XREF_D3D_' + n):
+                xref[k] = int(a, 0)
+    for k, v in args.seed:
+        xref[k] = v
 
     work = []  # (lib, sym, own xref, [(ver, pattern)])
     for lib, table, secs, folder in LIBS:
@@ -205,7 +223,6 @@ def main():
                                     break
                             if ok:
                                 hits.append((va + cur, data, cur))
-                            # overlapping matches: finditer skips them; patterns are short enough
                     if not hits:
                         continue
                     pick = hits[detect - 1] if detect and len(hits) >= detect else hits[0]
