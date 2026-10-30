@@ -3,8 +3,8 @@
     python -I tools/xbeimports.py <default.xbe> [sdk]
 
 Names come from sdk/runtime/kernel/ordinals.cpp; an import counts as implemented when a
-KERNEL_EXPORT, KERNEL_FASTCALL or KERNEL_DATA in sdk/runtime or src/ defines its ordinal.
-Exits 1 when any is missing. Read-only; stdlib only.
+KERNEL_EXPORT, KERNEL_FASTCALL, KERNEL_DATA, RegisterExport or RegisterData in sdk/runtime or
+src/ defines its ordinal. Exits 1 when any is missing. Read-only; stdlib only.
 """
 import os
 import re
@@ -12,7 +12,8 @@ import struct
 import sys
 
 THUNK_KEYS = (0x5B6D40B6, 0xEFB1F152)  # retail, debug
-DEFINES = re.compile(r'KERNEL_(?:EXPORT|FASTCALL|DATA)\(\s*(\d+)\s*,')
+# DbgPrint (8) is registered with a direct RegisterExport call, not the macros
+DEFINES = re.compile(r'(?:KERNEL_(?:EXPORT|FASTCALL|DATA)|RegisterExport|RegisterData)\(\s*(\d+)\s*,')
 
 
 def va_to_file(d, va):

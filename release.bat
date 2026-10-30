@@ -1,4 +1,6 @@
 @echo off
+rem Hunter.zip is for local and Steam Deck testing only. Never attach it to a GitHub release: releases
+rem are source only (CONTRIBUTING.md). It holds no game code, but it is still a build.
 set "GAME_EXE=Hunter"
 cd /d "%~dp0"
 set "OUT=out\build\release"

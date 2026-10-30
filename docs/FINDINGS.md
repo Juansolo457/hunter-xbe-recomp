@@ -71,8 +71,9 @@ There is no DMUSIC section although the library is listed; strings such as "Atla
 Unable to initialize DirectMusic" show the engine's DirectMusic path. Whether it runs is open.
 
 ### Kernel imports
-All 123 are implemented by the SDK at `91146ff` except `DbgPrint` (ordinal 8), which
-`src/game/hooks.cpp` defines as the 007 port does.
+All 123 are implemented by the SDK at `91146ff`. `DbgPrint` (ordinal 8) is registered with a
+direct `RegisterExport` call in `sdk/runtime/kernel/xboxkrnl.cpp` rather than the `KERNEL_*`
+macros, which hid it from the first `xbeimports.py`; the 007 port's own override is not needed.
 
 ### The engine
 High Voltage Software's Atlas engine: classes `HunterApp`, `HtHunterManager`,
