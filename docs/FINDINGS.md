@@ -19,7 +19,7 @@ Facts about Hunter: The Reckoning (USA), with how each was found. Read with `too
 | Built | 2002-04-01 (image), certificate 2002-04-03 |
 | Debug path | `C:\DEVELOP\HUNTER\Build\code\HunterXDecember___Xbox_Release\HunterXDecember.exe` |
 | Base | `0x10000` |
-| Entry | `0x15226D` (retail XOR key) |
+| Entry | `0xA27C1` (retail XOR key; `xbe_symbols` agrees) |
 | Kernel thunk | `0x25F800` (in `.rdata`), 123 imports |
 | TLS directory | `0x26BD44` |
 
@@ -48,8 +48,9 @@ There is no DMUSIC section although the library is listed; strings such as "Atla
 Unable to initialize DirectMusic" show the engine's DirectMusic path. Whether it runs is open.
 
 ### Kernel imports
-All 123 are implemented by the SDK at `91146ff` except `DbgPrint` (ordinal 8), which
-`src/game/hooks.cpp` defines as the 007 port does.
+All 123 are implemented by the SDK at `91146ff`. `DbgPrint` (ordinal 8) is registered with a
+direct `RegisterExport` call in `sdk/runtime/kernel/xboxkrnl.cpp` rather than the `KERNEL_*`
+macros, which hid it from the first `xbeimports.py`; the 007 port's own override is not needed.
 
 ### The engine
 High Voltage Software's Atlas engine: classes `HunterApp`, `HtHunterManager`,

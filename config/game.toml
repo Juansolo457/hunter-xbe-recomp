@@ -1,19 +1,21 @@
-# Recompiler input for default.xbe. build.bat / build.sh replace this with the config xbe_symbols writes:
+# Recompiler input for default.xbe, a placeholder until milestone M0 (docs/PLAN.md). build.bat runs
 #   xbe_symbols assets/default.xbe sdk/xdk --library Hunter.dll --out config/game.toml
+# only while this file has no [symbols] table (build.sh is a stub until M5), so once xbe_symbols
+# or a hand edit adds one, the file is kept and completed by hand (docs/HANDOFF.md).
 # xbe_symbols needs 4361 signatures, which do not exist yet: Hunter is built on XDK 4361
-# (docs/FINDINGS.md) and the SDK ships 4831 and 5849. They go in the overlay config/xdk/4361/
-# (milestone M0 in docs/PLAN.md).
+# (docs/FINDINGS.md) and the SDK ships 4831 and 5849. They go in the overlay config/xdk/4361/.
 # Names left at 0 become trapping stubs; find them in Ghidra
 # (python sdk/tools/symbols/xbe2pe.py config/game.toml hunter.exe) and fill them in by hand.
 [xbe]
 path = "assets/default.xbe"
-title = 0x56550007
-entry = 0x15226D
+title = 0x56550007  # certificate title id, tools/xbeinfo.py
+entry = 0xA27C1  # header entry XOR the retail key 0xA8FC57AB, tools/xbeinfo.py
 xdk = 4361
 out = "generated/game"
 library = "Hunter.dll"  # <exe>.dll, which the executable delay loads
 partitions = 64
-code_sections = [".text", "D3D", "DSOUND", "D3DX", "XGRPH", "WMADECXM", "WMADEC", "XPP", "DOLBY"]
+# DOLBY is left out: it holds the Dolby Digital encoder's DSP image, not x86 (docs/FINDINGS.md)
+code_sections = [".text", "D3D", "DSOUND", "D3DX", "XGRPH", "WMADECXM", "WMADEC", "XPP"]
 
 # Optional fixes, added by hand:
 # data_ranges = [[0x00150000, 0x00150040]]  # in [xbe]: bytes in code sections that are never code, end exclusive

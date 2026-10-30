@@ -9,9 +9,9 @@ import hashlib
 import struct
 import sys
 
-ENTRY_KEYS = {'retail': 0xA8E35207, 'debug': 0x94859D4B}
+ENTRY_KEYS = {'retail': 0xA8FC57AB, 'debug': 0x94859D4B}
 THUNK_KEYS = {'retail': 0x5B6D40B6, 'debug': 0xEFB1F152}
-SECTION_FLAGS = {1: 'W', 2: 'preload', 4: 'X', 8: 'head-page-ro', 16: 'tail-page-ro'}
+SECTION_FLAGS = {1: 'W', 2: 'preload', 4: 'X', 8: 'inserted', 0x10: 'head-page-ro', 0x20: 'tail-page-ro'}
 
 
 def when(t):

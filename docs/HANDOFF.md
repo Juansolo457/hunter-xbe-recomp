@@ -28,9 +28,10 @@ after an internet outage mixed up two sessions. The docs now follow the correcte
   `Hunter.dll`, `project(hunter)`). Issue templates from the 007 port.
 - `config/game.toml`: placeholder with Hunter's `[xbe]` header (title, entry, xdk 4361, code
   sections). `config/xdk/4361/` holds only a README so far. `src/common/game_info.cpp` filled
-  in. `src/game/hooks.cpp` defines `DbgPrint` (ordinal 8), the one kernel import the SDK lacks.
+  in. `src/game/hooks.cpp` has no hooks: the SDK implements all 123 kernel imports, `DbgPrint`
+  (ordinal 8) included.
 - Tools tested on the real disc: `xiso.py` (list, extract all or some), `xbeinfo.py`,
-  `xbeimports.py` (123 imports, 0 missing with hooks.cpp). `audit_repo.py` adapted to this repo;
+  `xbeimports.py` (123 imports, 0 missing). `audit_repo.py` adapted to this repo;
   `test_audit_repo.py`, 6 cases, pass.
 - `build.sh` is a stub until M5.
 
