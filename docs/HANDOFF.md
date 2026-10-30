@@ -22,8 +22,9 @@ after an internet outage mixed up two sessions. The docs follow the corrected or
 rendered correctly, smooth (user, 2026-10-28). Weapon and enemy sounds were silent (DirectMusic's
 clock, step 12): fixed and confirmed by the user 2026-10-29. No known bugs in what has been played.**
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
-  Open, stacked: PR #1 `bootstrap`, PR #2 `m0-first-build` (the first build), and the `m1-boot`
-  PR (this boot work). CodeRabbit is not installed yet: merge in order once the user has reviewed.
+  Everything so far came in through three stacked PRs, merged in order at the user's request
+  (2026-10-29): #1 `bootstrap`, #2 `m0-first-build` (the first build), #3 `m1-boot` (this boot
+  work). CodeRabbit reviews PRs; its 11 threads on #1 were fixed or answered before the merge.
 - `config/game.toml`: 138 of 253 XDK functions and 11 of 13 data addresses, each labelled with where it
   came from (`tools/make_config.py` writes it; FINDINGS.md). 113 names are at 0: 37 are
   networking names Hunter doesn't link, the rest not found or not called yet.
@@ -101,16 +102,20 @@ Each stop, its cause and the fix, in order:
   lists each draw's blend mode and world translations.
 - The 4361 overlay itself (`config/xdk/4361/layout.toml`, signatures still to sign).
 
+Unchanged here, to report (from CodeRabbit's review of PR #1):
+- `tools/sdk_sync/sdk_sync.py` reads `overrides` from the top level of a game's `sdk.toml`, but
+  `set_pin` writes it under `[sdk]`, where it is ignored; `set_pin` also updates only `version`,
+  never `commit`. This repo keeps `overrides` at the top level and updates `commit` by hand.
+- `THIRD_PARTY.txt` lacks the Zydis notice, though `xbe_recomp` links Zydis.
+
 ## Next steps (M1)
-1. **Play past the menu**: start a game, find the next stop. Expect more DirectSound and D3D
+1. **Play further**: saves, later levels and co-op are untested. Expect more DirectSound and D3D
    names the game calls but the config lacks: `tools/` has no automatic list yet, see the method in
    "Debugging" below. `D3DDevice_SetVertexShaderConstant` (`0x205470`) runs as console code (the
    SDK only knows the later variants); check whether constants reach the renderer.
 2. Gamma: 4361 keeps one pending gamma index (`+0x2A8C`), the runtime expects a flag per ramp;
    gamma changes are not applied yet.
-3. `DirectSoundGetSampleTime` returns 0 (it reads the APU clock only for the library's own
-   DirectSound object); check what the game times with it.
-4. DirectMusic, the WMA decoder and Dolby sections: not met yet.
+3. DirectMusic now plays (step 12); the WMA decoder and Dolby sections: not met yet.
 
 ## Debugging
 - Release builds log only errors and Report lines (`NDEBUG`); `out/build/debug` (preset `debug`,

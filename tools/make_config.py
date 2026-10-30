@@ -110,6 +110,15 @@ def main():
                         '#   k=<score> xbe_symbols matched by constants only, checked by eye where noted\n'
                         '#   oovpa <v> an XbSymbolDatabase pattern of revision <v> matched (both agree on all 46 they share)\n'
                         '# Names at 0 are not linked in Hunter or not found yet; the host traps if one it needs is called.')
+    # the 4361 overlay instead of [xbe] xdk, and where the header values were proven
+    head = head.replace('\n\n[xbe]\n', '\n#\n# The XDK 4361 layouts come from the overlay below: the SDK ships 4831 and 5849 only, and\n'
+                                       '# [xbe] xdk = 4361 would look for sdk/xdk/4361/layout.toml.\n'
+                                       'includes = ["xdk/4361/layout.toml"]\n\n[xbe]\n', 1)
+    head = re.sub(r'(?m)^xdk = \d+\n', '', head)
+    head = re.sub(r'(?m)^(title = \S+)$', r'\1  # certificate title id, tools/xbeinfo.py', head)
+    head = re.sub(r'(?m)^(entry = \S+)$', r'\1  # header entry XOR the retail key 0xA8FC57AB, tools/xbeinfo.py', head)
+    head = re.sub(r'(?m)^code_sections', '# DOLBY is left out: it holds the Dolby Digital encoder\'s DSP image, not x86 '
+                                         '(docs/FINDINGS.md)\ncode_sections', head)
     out.append(head + '[symbols]')
     width = max(len(n) for n in sdk)
     kscore = dict(re.findall(r'(\w+) found by constants \(([\d.]+)\)',
