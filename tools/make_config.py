@@ -63,6 +63,9 @@ HAND = {
                                              'calls 0x214951 as the buffer\'s SetMode does'),
     'CDirectSoundStream_SetMixBinVolumes': (0x2140EA, 'by hand: IDirectSoundStream_SetMixBinVolumes 0x2143A9 jumps to '
                                                       'it (ret 8), it calls 0x2133BE as the buffer\'s does'),
+    'DirectSoundGetSampleTime': (0x21302F, 'oovpa 3911; by hand: reads the APU sample counter 0xFE80200C when the '
+                                           'library\'s DirectSound exists; DirectMusic\'s reference clock 0xEC8A5 '
+                                           'calls it at 0xEC8CD'),
     'XInputGetCapabilities': (0, 'xbe_symbols matched 0x25DB04 by constants (0.60); that code claims a '
                                  'device slot and counts opens, XInputOpen\'s job (XInputOpen is 0x25900D)'),
 }

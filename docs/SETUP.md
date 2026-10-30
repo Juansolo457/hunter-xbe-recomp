@@ -4,7 +4,7 @@ This project ships **source only**. No download contains the game. The game's co
 translated from your own copy of the Xbox disc on your machine, and the game data comes from the
 same disc. You need **Hunter: The Reckoning (USA)** for the original Xbox.
 
-> Early days: it builds on Windows and boots to the main menu; nothing past it is tested. See [HANDOFF.md](HANDOFF.md) for where it stands.
+> Early days: it builds on Windows and plays; only the first areas are tested. See [HANDOFF.md](HANDOFF.md) for where it stands.
 > These steps describe the target and grow with each milestone.
 
 ## 1. Get the game files
@@ -31,7 +31,7 @@ development with C++**, **C++ Clang tools for Windows** and **C++ CMake tools fo
 (`build.bat` offers to add the last two), then run `build.bat`. The first build recompiles the
 game and takes a while. The exe is written to `out\build\release\Hunter.exe`.
 
-It boots to the main menu (M1 in [PLAN.md](PLAN.md) is getting it playable).
+It plays (M2 in [PLAN.md](PLAN.md) is getting it through the whole game).
 
 ## Steam Deck and Linux
 

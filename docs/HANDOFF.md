@@ -19,8 +19,8 @@ after an internet outage mixed up two sessions. The docs follow the corrected or
 
 ## Where it stands
 **M1 in progress: the game boots on Windows and plays: menus, a new game, moving around, characters
-rendered correctly, smooth (user, 2026-10-28). Only ambient sound plays in game: weapon and enemy
-sounds are silent (step 12 has the cause). Testing is paused while the user works on F.E.A.R.**
+rendered correctly, smooth (user, 2026-10-28). Weapon and enemy sounds were silent (DirectMusic's
+clock, step 12): fixed 2026-10-29, the user's check pending.**
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
   Open, stacked: PR #1 `bootstrap`, PR #2 `m0-first-build` (the first build), and the `m1-boot`
   PR (this boot work). CodeRabbit is not installed yet: merge in order once the user has reviewed.
@@ -76,17 +76,15 @@ Each stop, its cause and the fix, in order:
     only (an in-game F3 capture showed w1 all zeros). Both fixed in the SDK (vertex blending in
     `gpu/shaders.cpp` with world 1 to 3 constants filled in `gpu/d3d12.cpp`; the render thread copies
     the four world matrices). The user confirmed the characters are right.
-12. Weapon and enemy sounds are silent while ambience plays: **open, next up.** The `XBE_AUDIO_LOG` run
-    (user, 2026-10-28, 7.8 min in game firing and meeting enemies) logged about 30 voices, none 3D,
-    and no weapon or enemy sound ever reached the runtime's Play. Among them, four looping 48 kHz
-    PCM buffers routed to mix bins 0+1, 2, 3 and 4+5: the DirectMusic software synth's sink (the
-    game's "Atlas Sound DM" layer plays its effects through DirectMusic). The synth refills those
-    buffers on **SetNotificationPositions** events, which the runtime accepts but never signals
-    (step 10), so everything DirectMusic plays is silent. Fix: keep each buffer's notification
-    offsets and events (DSBPOSITIONNOTIFY pairs) and signal an event when the play cursor crosses
-    its offset in the mixer (and on stop for DSBPN_OFFSETSTOP), in `sdk/runtime/xdk/dsound.cpp`.
-    `IDirectSound_CreateSoundStream` and the stream SetMode, SetMaxDistance, SetMinDistance,
-    SetMixBinVolumes were added on the way (the synth calls them).
+12. **Silent effects** (weapon, enemy and other DirectMusic sounds; only ambience played): DirectMusic's
+    reference clock (`0xEC8A5`) advances by `DirectSoundGetSampleTime`, which the library reads from the
+    APU only for its own DirectSound object, so under the runtime it returned 0, the clock never moved,
+    and DirectMusic never played anything. SDK fix: `DirectSoundGetSampleTime` returns the samples the
+    mixer has rendered at 48 kHz. A 40 s smoke run then logged dozens of effect voices where the user's
+    8 minute session had about 30 in all. On the way: SetNotificationPositions now signals its events as
+    the play cursor passes their offsets (and DSBPN_OFFSETSTOP ones on stop); IDirectSoundStream create,
+    SetMode, SetMaxDistance, SetMinDistance, SetMixBinVolumes added. User check of weapon and enemy
+    sounds pending.
 
 ## SDK changes to offer upstream (TGP482/XboxXBE-Recomp)
 `sdk/` was unchanged until this work; every change here is portable and game-agnostic:
@@ -96,7 +94,8 @@ Each stop, its cause and the fix, in order:
 - `runtime/xdk/dsound.cpp`: `IDirectSoundBuffer_AddRef`, `IDirectSoundBuffer_SetPitch`,
   `CDirectSoundStream_SetPitch`, `CDirectSoundStream_SetOutputBuffer`, `IDirectSound_SetAllParameters`,
   and the twelve buffer and stream methods of step 10; `IDirectSound_CreateSoundStream`, stream SetMode;
-  the `XBE_AUDIO_LOG` diagnostic.
+  `DirectSoundGetSampleTime` from the mixer's sample count; SetNotificationPositions events; the
+  `XBE_AUDIO_LOG` diagnostic.
 - `runtime/gpu/shaders.cpp`, `shaders.h`, `d3d12.cpp`, `render_thread.cpp`: fixed function vertex blending
   (D3DRS_VERTEXBLEND 1 to 6) and the four world matrices reaching the render thread; the F3 capture
   lists each draw's blend mode and world translations.

@@ -162,6 +162,10 @@ X86Func* Find(uint32_t guest);
 #define SYM_CDirectSoundStream_SetMode FFFFFF21
 #define HAS_CDirectSoundStream_SetMode 0
 #endif
+#ifndef SYM_DirectSoundGetSampleTime
+#define SYM_DirectSoundGetSampleTime FFFFFF22
+#define HAS_DirectSoundGetSampleTime 0
+#endif
 
 namespace {
 
@@ -226,6 +230,10 @@ struct Voice {
     uint8_t nbins = 0, bin[8] = {};
     int32_t bin_mb[32] = {};  // by mix bin
     std::vector<float> curve;  // rolloff
+    // DSBPOSITIONNOTIFY pairs (byte offset in the buffer, event handle) by offset, and the byte position they were
+    // last checked at: an event is set when the play cursor passes its offset, DSBPN_OFFSETSTOP ones when it stops
+    std::vector<std::pair<uint32_t, uint32_t>> notify;
+    uint32_t notify_at = 0;
     bool is3d = false;
     uint32_t mode = 0;  // DS3DMODE: 1 head relative, 2 disabled
     float p[3] = {}, min_dist = 1, max_dist = 1e9f;
@@ -686,13 +694,56 @@ void MixVoice(Voice& v, float* bins, uint32_t frames) {
     v.itd = itd;
 }
 
+// position notifications (SetNotificationPositions). The DirectMusic synth refills its sink buffers when they fire.
+constexpr uint32_t kOffsetStop = 0xFFFFFFFF;  // DSBPN_OFFSETSTOP
+
+// samples the output has taken at 48 kHz: the APU's sample counter DirectSoundGetSampleTime reads, and with it
+// DirectMusic's reference clock, which schedules everything it plays
+std::atomic<uint32_t> g_sample_time{0};
+
+// the play cursor as a byte offset in the buffer, as DSBPOSITIONNOTIFY counts it
+uint32_t NotifyBytes(const Voice& v) { return v.play_start + BytesOf(v, uint32_t(v.pos)); }
+
+void Signal(uint32_t handle) {
+    if (ObjectRef o = FromHandle(handle)) SetEvent(*o);
+}
+
+// sets the events whose offsets the cursor passed going from notify_at to now, across the loop's wrap when now is behind
+void PassNotifications(Voice& v, uint32_t now) {
+    if (v.notify.empty() || now == v.notify_at) return;
+    uint32_t was = v.notify_at;
+    for (const auto& [off, event] : v.notify) {
+        if (off == kOffsetStop) continue;
+        bool passed = now > was ? off > was && off <= now : off > was || off <= now;
+        if (passed) Signal(event);
+    }
+    v.notify_at = now;
+}
+
+// the buffer stopped: the offsets up to the end of its play region, then the DSBPN_OFFSETSTOP events
+void StopNotifications(Voice& v, bool reached_end) {
+    if (v.notify.empty()) return;
+    if (reached_end) {
+        uint32_t end = v.play_start + v.play_len;
+        for (const auto& [off, event] : v.notify)
+            if (off != kOffsetStop && off > v.notify_at && off <= end) Signal(event);
+    }
+    for (const auto& [off, event] : v.notify)
+        if (off == kOffsetStop) Signal(event);
+    v.notify_at = NotifyBytes(v);
+}
+
 void Render(float* out, uint32_t frames) {
+    g_sample_time.fetch_add(frames, std::memory_order_relaxed);
     static std::vector<float> bins;  // the output thread alone renders
     bins.assign(size_t(frames) * kBins, 0.0f);
     std::lock_guard<std::recursive_mutex> lock(g_lock);
     for (auto& [obj, v] : g_voices) {
         if (v.paused || v.sync || (!v.stream && !v.playing)) continue;
         MixVoice(v, bins.data(), frames);
+        if (v.stream) continue;
+        if (v.playing) PassNotifications(v, NotifyBytes(v));
+        else StopNotifications(v, true);  // played to the end of its region
     }
     if (dsp::Loaded()) dsp::Run(bins.data(), frames);
     for (uint32_t i = 0; i < frames; i++) {
@@ -838,7 +889,7 @@ static void AuditExports() {
         SYM(IDirectSoundBuffer_SetFilter), SYM(IDirectSoundBuffer_SetHeadroom), SYM(IDirectSoundBuffer_SetMixBinVolumes),
         SYM(IDirectSoundBuffer_SetMixBins), SYM(IDirectSoundBuffer_SetMaxDistance), SYM(IDirectSoundBuffer_SetMinDistance),
         SYM(IDirectSoundBuffer_SetPosition), SYM(IDirectSoundBuffer_SetVelocity), SYM(IDirectSoundBuffer_SetI3DL2Source),
-        SYM(DirectSoundCreateStream), SYM(IDirectSound_CreateSoundStream), SYM(CDirectSoundStream_SetMode),
+        SYM(DirectSoundCreateStream), SYM(IDirectSound_CreateSoundStream), SYM(CDirectSoundStream_SetMode), SYM(DirectSoundGetSampleTime),
         SYM(CDirectSoundStream_AddRef), SYM(CDirectSoundStream_SetFormat),
         SYM(CDirectSoundStream_Release), SYM(CDirectSoundStream_GetInfo), SYM(CDirectSoundStream_GetStatus),
         SYM(CDirectSoundStream_Process), SYM(CDirectSoundStream_Discontinuity), SYM(CDirectSoundStream_Flush),
@@ -941,6 +992,9 @@ HLE_STDCALL(IDirectSound_SetAllParameters, 3) {
     }
     return 0;
 }
+// the APU's sample counter; the library reads it from the hardware only for its own DirectSound object, which the
+// host replaces, and returned 0, which stopped DirectMusic's clock (no music cues or effects played through it)
+HLE_STDCALL(DirectSoundGetSampleTime, 0) { return g_sample_time.load(std::memory_order_relaxed); }
 HLE_STDCALL(DirectSoundDoWork, 0) {
     g_pumped = NowMs();
     std::vector<Done> done;
@@ -1093,15 +1147,18 @@ BUFFER(Play, 4) {
     v.looping = a[3] & 1;
     if (a[3] & 2) v.pos = 0;
     v.sync = a[3] & 4;
+    v.notify_at = NotifyBytes(v);
     LogPlay("buffer play", v);
     return 0;
 }
 BUFFER(Stop, 1) {
+    if (v.playing) StopNotifications(v, false);
     v.playing = false;
     return 0;
 }
 // (this, time low, time high, flags): stops now, the release envelope is not reproduced
 BUFFER(StopEx, 4) {
+    if (v.playing) StopNotifications(v, false);
     v.playing = false;
     return 0;
 }
@@ -1120,6 +1177,7 @@ BUFFER(SetPlayRegion, 3) {
     v.play_len = v.loop_len = a[2] ? a[2] : v.bytes - a[1];
     v.loop_start = 0;
     v.pos = 0;
+    v.notify_at = NotifyBytes(v);
     ForgetBlocks(v);
     return 0;
 }
@@ -1141,6 +1199,7 @@ BUFFER(GetCurrentPosition, 3) {
 }
 BUFFER(SetCurrentPosition, 2) {
     v.pos = FramesOf(v, a[1]);
+    v.notify_at = NotifyBytes(v);
     return 0;
 }
 BUFFER(Lock, 8) {
@@ -1177,9 +1236,16 @@ BUFFER(SetMode, 3) {
     v.mode = a[1];
     return 0;
 }
-// TODO: the events are never signalled; nothing here tracks play positions against them yet
+// (this, count, DSBPOSITIONNOTIFY array): offset and event handle pairs, kept by offset as the library does; none clears
 BUFFER(SetNotificationPositions, 3) {
-    LOG_FIRST(1, "dsound: SetNotificationPositions (%u positions) accepted, its events are not signalled", a[1]);
+    v.notify.clear();
+    for (uint32_t i = 0; i < a[1] && a[2]; i++) v.notify.emplace_back(R32(a[2] + i * 8), R32(a[2] + i * 8 + 4));
+    std::sort(v.notify.begin(), v.notify.end());
+    v.notify_at = NotifyBytes(v);
+    if (AudioLog()) {
+        LOGR("audio: SetNotificationPositions %08X %u positions, first at %u, %u bytes", v.obj, a[1],
+             v.notify.empty() ? 0 : v.notify[0].first, v.bytes);
+    }
     return 0;
 }
 BUFFER(SetFilter, 2) { return 0; }

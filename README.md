@@ -22,8 +22,8 @@ The route, as with [graw360-recomp](https://github.com/Juansolo457/graw360-recom
 
 ## Status
 
-**Boots to the main menu on Windows.** The intro movies play with sound and the menu shows;
-nothing past the menu is tested yet. Hunter is built on XDK 4361, which the SDK doesn't ship: this
+**Playable on Windows, early.** The intro movies, menus and a new game work, characters render
+correctly and it runs smoothly; play past the first areas, saves and co-op are untested. Hunter is built on XDK 4361, which the SDK doesn't ship: this
 repo carries the 4361 layout as an overlay and a few SDK fixes meant for upstream.
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones
