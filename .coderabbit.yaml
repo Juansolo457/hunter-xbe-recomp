@@ -24,10 +24,9 @@ reviews:
   path_instructions:
     - path: "sdk/**"
       instructions: >
-        This is a vendored copy of TGP482's XboxXBE-Recomp SDK (MIT) with this project's Linux
-        and Vulkan changes made in place, intended to go back upstream. Flag anything that would
-        break the Windows build, anything Windows-only added to a shared file without a Linux
-        path, and anything game-specific that belongs in src/ instead. Thread safety matters:
+        This is a vendored copy of TGP482's XboxXBE-Recomp SDK (MIT), kept as upstream ships it
+        until the native Linux phase. Flag any change here that is not an upstream sync, and
+        anything game-specific that belongs in src/ or config/ instead. Thread safety matters:
         the game runs its own threads through the kernel layer, and the renderer has a thread of
         its own.
     - path: "src/**"
@@ -35,7 +34,7 @@ reviews:
         Host code and hooks over recompiled x86 guest code. Check guest pointer handling
         (kernel::HostPtr, 32-bit addresses), calling conventions on X86_FUNC overrides, and that
         nothing from the game (data, strings, addresses dumped from tools) is pasted in beyond
-        the addresses a hook needs. Both Windows and Linux must build.
+        the addresses a hook needs. The Windows build must keep building.
     - path: "config/**"
       instructions: >
         Recompiler config: every address should have a comment saying where it was proven.

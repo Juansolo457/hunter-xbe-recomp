@@ -1,0 +1,10 @@
+# The SDK copy in sdk/, pinned for sdk/tools/sdk_sync/sdk_sync.py (XboxXBE-Recomp, MIT).
+
+# files in sdk/ that are this game's own and must not go upstream; top level, where sdk_sync reads it
+overrides = []
+
+[sdk]
+path = "sdk"
+version = "0.1.0"
+# sdk_sync updates only version: change commit by hand after each sync
+commit = "91146ff6e2a218b19c1109dc665d06020472ab57"  # https://github.com/TGP482/XboxXBE-Recomp, 2026-10-27

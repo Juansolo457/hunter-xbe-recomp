@@ -1,0 +1,23 @@
+hunter-xbe-recomp: licensing notice
+
+Everything here is MIT licensed, under two copyright holders. Copied code keeps its own notice.
+
+1. This project's own code: MIT (LICENSE), copyright juansolo457 and contributors
+   src/, config/, tools/ (audit_repo.py and test_audit_repo.py come from the sibling
+   quake4-360-recomp, same author), docs/, build.sh and the top-level files, except where a
+   file's header says otherwise. AGENTS.md and CLAUDE.md follow the agent-harness template
+   (same author).
+
+2. XboxXBE-Recomp SDK: MIT (LICENSES/XboxXBE-Recomp-MIT.txt), copyright TGP482
+   sdk/ is an unchanged copy of https://github.com/TGP482/XboxXBE-Recomp at the commit
+   sdk.toml names. config/xdk/4361/ follows the format of its sdk/xdk/<build> files. CMakeLists.txt, CMakePresets.json, build.bat, release.bat, config/game.toml's
+   comments, src/common/game_info.cpp and src/game/hooks.cpp start from its templates/game.
+   .github/ISSUE_TEMPLATE comes from TGP482's 007FRWL-XBERecomp (MIT).
+   The libraries CMake fetches (Zydis, toml++, Dear ImGui, SDL3) and LLVM keep their own
+   licenses: sdk/THIRD_PARTY.txt and sdk/tools/LLVM-LICENSE.txt.
+
+Hunter: The Reckoning is a trademark of its owners (High Voltage Software developed it;
+Interplay / Vivendi Universal published it; the World of Darkness property is White Wolf /
+Paradox Interactive's). This project isn't affiliated with any of them or with Microsoft, and
+contains none of the game's code or data: the game's code is translated on your own machine
+from your own disc.
