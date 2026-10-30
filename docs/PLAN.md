@@ -41,7 +41,7 @@ config/xdk/4361   the XDK layout and signatures the SDK lacks for this build
 | M0 | **XDK 4361 and the first build** (built 2026-10-28; the open symbols carry into M1) | `config/xdk/4361/layout.toml` with every key proven in Hunter's code; `config/game.toml` complete (every symbol the 4831 set names found in Hunter or proven absent); the overlay wired into the build; `Hunter.exe` links. Signatures for upstream are still to sign |
 | M1 | **Boot on Windows** (in progress: the front end, a new game, characters and sound work, the user confirmed 2026-10-29; DirectMusic and Bink handled, the WMA decoder and Dolby sections not met yet) | The title reaches its front end menu; kernel and XDK gaps (DirectMusic, WMA, Dolby sections, Bink) handled |
 | M2 | **Playable on Windows (0.1)** | The game plays through: levels, saves, co-op on one PC |
-| M3 | **Steam Deck through Proton** | A push-over-SSH helper; the user plays on the Deck; Deck issues fixed in the Windows build |
+| M3 | **Steam Deck through Proton** (in progress: the first test build is on the Deck, 2026-10-30) | A push-over-SSH helper; the user plays on the Deck; Deck issues fixed in the Windows build |
 | M4 | **007 parity (1.0)** | Mouse and keyboard, texture replacement, HDR, draw distance and the other 007 options that suit Hunter |
 | M5 | **Native Linux** | SDK fork; Vulkan backend behind `gpu::Backend` (raw Vulkan + VMA, HLSL to SPIR-V with DXC), SDL3 app and audio; native on the Deck |
 
