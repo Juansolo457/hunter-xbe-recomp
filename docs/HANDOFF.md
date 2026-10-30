@@ -20,7 +20,7 @@ after an internet outage mixed up two sessions. The docs follow the corrected or
 ## Where it stands
 **M1 in progress: the game boots on Windows and plays: menus, a new game, moving around, characters
 rendered correctly, smooth (user, 2026-10-28). Weapon and enemy sounds were silent (DirectMusic's
-clock, step 12): fixed 2026-10-29, the user's check pending.**
+clock, step 12): fixed and confirmed by the user 2026-10-29. No known bugs in what has been played.**
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
   Open, stacked: PR #1 `bootstrap`, PR #2 `m0-first-build` (the first build), and the `m1-boot`
   PR (this boot work). CodeRabbit is not installed yet: merge in order once the user has reviewed.
@@ -83,8 +83,8 @@ Each stop, its cause and the fix, in order:
     mixer has rendered at 48 kHz. A 40 s smoke run then logged dozens of effect voices where the user's
     8 minute session had about 30 in all. On the way: SetNotificationPositions now signals its events as
     the play cursor passes their offsets (and DSBPN_OFFSETSTOP ones on stop); IDirectSoundStream create,
-    SetMode, SetMaxDistance, SetMinDistance, SetMixBinVolumes added. User check of weapon and enemy
-    sounds pending.
+    SetMode, SetMaxDistance, SetMinDistance, SetMixBinVolumes added. **The user confirmed the sound is
+    fixed (2026-10-29).**
 
 ## SDK changes to offer upstream (TGP482/XboxXBE-Recomp)
 `sdk/` was unchanged until this work; every change here is portable and game-agnostic:
