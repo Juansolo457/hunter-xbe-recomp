@@ -1,7 +1,10 @@
 """Disassemble a function of an XBE, naming known addresses.
 
-    python -m venv .venv-tools && .venv-tools/Scripts/pip install capstone   (once, outside the repo)
-    .venv-tools/Scripts/python -I tools/xbedis.py assets/default.xbe <hex address or name> [count]
+From the repository root, with the environment in a folder beside it (bin/ for Scripts/ on Linux):
+
+    python -m venv ../hunter-tools-venv                                   (once)
+    ../hunter-tools-venv/Scripts/python -m pip install capstone           (once)
+    ../hunter-tools-venv/Scripts/python -I tools/xbedis.py assets/default.xbe <hex address or name> [count]
 
 Names come from name<TAB>0xADDR files in the current folder (cfgsyms.tsv, oovpa.tsv, oovpa2.tsv:
 oovpa_scan.py output and the config's symbols). Needs capstone: install it in a virtual environment
