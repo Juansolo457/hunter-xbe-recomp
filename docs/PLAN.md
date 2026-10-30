@@ -22,7 +22,7 @@ The Xbox Hunter: The Reckoning running natively, its x86 code translated to C++ 
   draw distance are 1.0 features.
 - **CodeRabbit reviews every pull request**; `master` is locked like the other recomps.
 - **Source only.** No release ships the game's code; players build from their own disc.
-- **Builds and test windows are free in this repo** while debugging; never close the user's
+- **Ask the user before any build or test run** (since 2026-10-29); never close the user's
   running game.
 
 ## Architecture

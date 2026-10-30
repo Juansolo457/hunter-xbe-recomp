@@ -26,7 +26,7 @@ Vulkan renderers).
 - Never commit game data: ISOs, XBEs, extracted files (`assets/`), the recompiled code
   (`generated/`), captures, logs, saves. `private/` holds local ones. Releases are source only.
 - The game dump under `E:\OG-xbox-recomps\` is read-only.
-- Ask the user before any build, recompile or test run that opens a game window (the user,
+- Ask the user before any build, recompile or test run, with or without a game window (the user,
   2026-10-29; this replaces the free builds of 2026-10-28). Never close or kill a game the user
   started; ask them to quit it.
 - Don't record where game copies came from.

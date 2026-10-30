@@ -119,6 +119,13 @@ Unchanged here, to report (from CodeRabbit's reviews):
 2. Gamma: 4361 keeps one pending gamma index (`+0x2A8C`), the runtime expects a flag per ramp;
    gamma changes are not applied yet.
 3. DirectMusic now plays (step 12); the WMA decoder and Dolby sections: not met yet.
+4. **Position notifications across a whole loop** (CodeRabbit on PR #3): `Render` signals the
+   offsets between the cursor before and after a block (`PassNotifications` in
+   `sdk/runtime/xdk/dsound.cpp`). If a looping buffer plays a whole loop or more in one block, the
+   cursor ends on or past where it started and the offsets crossed in between are missed (none at
+   all when it ends on the same byte). Fix: count the bytes a block advanced and signal every offset
+   when that reaches the loop's length. Not seen in play (the sound works); needs a build and a test
+   run, so it waits for the user's OK.
 
 ## Debugging
 - Release builds log only errors and Report lines (`NDEBUG`); `out/build/debug` (preset `debug`,
