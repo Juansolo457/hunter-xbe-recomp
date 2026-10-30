@@ -38,7 +38,7 @@ config/xdk/4361   the XDK layout and signatures the SDK lacks for this build
 ## Milestones
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | **XDK 4361 and the first build** | `config/xdk/4361/layout.toml` with every key proven in Hunter's code; `config/game.toml` complete (every symbol the 4831 set names found in Hunter or proven absent); signatures signed from it; the overlay wired into the build; `Hunter.exe` links |
+| M0 | **XDK 4361 and the first build** (built 2026-10-28; the open symbols carry into M1) | `config/xdk/4361/layout.toml` with every key proven in Hunter's code; `config/game.toml` complete (every symbol the 4831 set names found in Hunter or proven absent); the overlay wired into the build; `Hunter.exe` links. Signatures for upstream are still to sign |
 | M1 | **Boot on Windows** | The title reaches its front end menu; kernel and XDK gaps (DirectMusic, WMA, Dolby sections, Bink) handled |
 | M2 | **Playable on Windows (0.1)** | The game plays through: levels, saves, co-op on one PC |
 | M3 | **Steam Deck through Proton** | A push-over-SSH helper; the user plays on the Deck; Deck issues fixed in the Windows build |

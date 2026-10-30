@@ -22,8 +22,8 @@ The route, as with [graw360-recomp](https://github.com/Juansolo457/graw360-recom
 
 ## Status
 
-**Just started.** The repository, the SDK copy and the first look at the disc. Nothing builds
-yet. The first hurdle: Hunter is built on XDK 4361, and the SDK knows 4831 and 5849 only.
+**Builds, doesn't boot yet.** Hunter is built on XDK 4361, which the SDK doesn't ship; this repo
+carries the 4361 layout as an overlay. `Hunter.exe` builds on Windows and stops in D3D setup.
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, where things live, next steps

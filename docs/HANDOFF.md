@@ -9,54 +9,77 @@ Static recompilation of **Hunter: The Reckoning** (Xbox, USA) in the shape of
 https://github.com/TGP482/007FRWL-XBERecomp, on TGP482's **XboxXBE-Recomp** SDK, the standard to
 hit. Order, as with GRAW: **Windows D3D12 first** with the SDK as it ships, then the **Steam
 Deck through Proton**, then **native Linux with Vulkan**. Pull requests reviewed by CodeRabbit
-(the user installs the GitHub app). House rules as in the sibling recomps: master protected,
-source-only releases, never commit game data, commit as
+later (the user installs the GitHub app; not yet). House rules as in the sibling recomps:
+master protected, source-only releases, never commit game data, commit as
 `juansolo457 <5344231+Juansolo457@users.noreply.github.com>`. Builds and test windows are free in
 this repo; never close a game the user is running.
 
 The first session (2026-10-27) started Linux-first; the user corrected the order on 2026-10-28
-after an internet outage mixed up two sessions. The docs now follow the corrected order.
+after an internet outage mixed up two sessions. The docs follow the corrected order.
 
 ## Where it stands
-**M0 started: the repository is up; nothing has been built.**
-- https://github.com/Juansolo457/hunter-xbe-recomp (public). `master` holds the repo basics
-  and the audit and is locked (below). Everything else comes in through the `bootstrap` pull
-  request, which waits for CodeRabbit and the user.
-- `sdk/`: XboxXBE-Recomp at `91146ff` (2026-10-27, 0.1.0, MIT), unchanged, pinned in
-  `sdk.toml`, without its `.github`.
-- Template files from the SDK's `templates/game`, renamed for Hunter (`Hunter.exe`,
-  `Hunter.dll`, `project(hunter)`). Issue templates from the 007 port.
-- `config/game.toml`: placeholder with Hunter's `[xbe]` header (title, entry, xdk 4361, code
-  sections). `config/xdk/4361/` holds only a README so far. `src/common/game_info.cpp` filled
-  in. `src/game/hooks.cpp` has no hooks: the SDK implements all 123 kernel imports, `DbgPrint`
-  (ordinal 8) included.
-- Tools tested on the real disc: `xiso.py` (list, extract all or some), `xbeinfo.py`,
-  `xbeimports.py` (123 imports, 0 missing). `audit_repo.py` adapted to this repo;
-  `test_audit_repo.py`, 6 cases, pass.
-- `build.sh` is a stub until M5.
+**M0 built: `Hunter.exe` builds and links on Windows. M1 (boot) starts: the first run stops in
+D3D setup at 0.19 s on three unknown data addresses.**
+- GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
+  PR #1 `bootstrap` (repo, SDK copy, template, tools, docs) and the `m0-first-build` PR on top
+  of it are open. CodeRabbit is not installed yet: merge once the user has reviewed.
+- `config/game.toml`: 129 of 248 XDK functions and 8 of 13 data addresses, each labelled with
+  where it came from (FINDINGS.md, "The XDK functions and data the host replaces"). 118 are at
+  0: 37 networking names Hunter doesn't link, the rest not found yet.
+- `config/xdk/4361/layout.toml`: 34 keys, every one proven at an address in Hunter's code; all
+  the keys the runtime requires are there. `config/game.toml` includes it with a top-level
+  `includes = [...]` instead of `[xbe] xdk = 4361`, so `sdk/` stays unchanged.
+- The build: `build.bat` (fixed to strip quotes from PATH, which broke VsDevCmd on this PC).
+  The first recompile and compile took a few minutes on 14 jobs: 18,848 functions, 340 jump
+  tables, 2.17 of 2.42 MB of code bytes. `generated/game` is 123 MB (ignored).
+- First run (windowed 1280x720 through `out/build/release/settings.toml`): the game is found in
+  `assets/` with the right SHA-1, the code DLL loads, then
+  `d3d: D3D_DeferredTextureState / D3D_RenderState / D3D_SimpleRenderStateEncode is unknown`
+  and the runtime aborts (exit `0xC0000409`, a dump in `out/build/release/CrashDumps`).
 
-## Next steps (M0)
-1. **Make Hunter's `config/game.toml` by hand.** For each name in
-   `sdk/xdk/4831/signatures.toml` `[symbols]` and `[data]`, find it in Hunter (Ghidra or REA on
-   `E:\OG-xbox-recomps\hunter-xbe\default.xbe`; library code lives in the `D3D`, `DSOUND`,
-   `XGRPH`, `D3DX`, `XPP` sections, XAPI and the CRT in `.text`), or leave it at 0 when the game
-   doesn't link it. Comment each address with how it was proven. TGP482's 007 config is the
-   model for a complete one.
-2. **`config/xdk/4361/layout.toml`**: the 52 keys of the 4831 file, each proven at an address in
-   Hunter's code, with the same comment style.
-3. **Wire the overlay in.** `build.bat` passes `%SDK%\xdk` to `xbe_symbols`, and
-   `add_xbe_image` in `sdk/cmake/XbeRecomp.cmake` passes `${XBE_SDK_DIR}/xdk` to `xbe_recomp`.
-   Point both at a folder holding the SDK's builds plus `config/xdk/4361`, from this repo's
-   `CMakeLists.txt` and `build.bat`, with `sdk/` unchanged (for example, copy both into
-   `out/build/release/xdk` at configure time). Then sign:
-   `xbe_symbols --sign config/game.toml --out config/xdk/4361/signatures.toml`.
-4. **First build** with `build.bat` (VS 2022 Clang + CMake are installed): recompile, compile,
-   link `Hunter.exe`.
+## Next steps (M1, boot)
+1. **The three D3D tables.** `D3D_RenderState` is the base of the render state array: the
+   `D3DDevice_SetRenderState_*` functions store to it (StencilEnable at `0x201A00` reads
+   `0x210024`, `0x210064`, `0x210068`). `D3D_DeferredTextureState`: the oovpa scan derived
+   `XREF_D3DTSS_TEXCOORDINDEX = 0x20FCA0` (SetTextureState_TexCoordIndex `0x201317` stores
+   `[stage * 128 + 0x20FCA0]`); the base is that minus TexCoordIndex's index * 4.
+   `D3D_SimpleRenderStateEncode` is the method table `D3DDevice_SetRenderState_Simple`
+   (`0x200BD0`) reads. XbSymbolDatabase's `manual_d3d8__ltcg.h` and its render state table
+   (`DxbxRenderStateInfo`, with the 4361 ranges) show how they are found.
+2. **Check the render state numbering.** `sdk/runtime/gpu/state.h` hard-codes the D3DRS indices
+   of 4831/5849. If 4361 numbers them differently (the XbSymbolDatabase table says which), the
+   runtime needs a 4361 mapping: that would be the first SDK change, made upstream-ready.
+3. Then run again and fix each stop: missing functions (the non-network ones the game calls),
+   DirectMusic, the WMA and Dolby sections, Bink in `.text`.
+
+## How it is built and run
+```
+python -I tools/xiso.py "E:\OG-xbox-recomps\Hunter - The Reckoning (USA).xiso.iso" extract assets
+build.bat                                    # VS 2022 Clang, CMake, Ninja; CI=1 skips its prompts
+out\build\release\Hunter.exe                 # finds assets/ in a folder above it
+```
+- `out/build/release/settings.toml` with `display_mode = "windowed"`, `width = 1280`,
+  `height = 720` keeps test windows off the whole screen (modes are lowercase).
+- After editing `config/xdk/4361/layout.toml`, touch `config/game.toml`: the recompile step
+  depends on `config/*.toml` and the SDK's xdk files, not the overlay.
+- Before a release: the first-launch compile on a player's PC copies `config/*.toml` into the
+  compiler folder (`compiler_files` in `sdk/cmake/XbeRecomp.cmake`) but not `config/xdk/`, so the
+  overlay must reach it too (or land upstream first).
+
+## Tools
+| | |
+|---|---|
+| `tools/xiso.py <iso> list \| extract <dir> [paths]` | XDVDFS reader |
+| `tools/xbeinfo.py <xbe>` | header, sections, XDK builds (entry key fixed: entry is `0xA27C1`) |
+| `tools/xbeimports.py <xbe>` | kernel imports against the SDK and `src/` |
+| `tools/oovpa_scan.py <XbSymbolDatabase checkout> <xbe> 4361 [--seed X=0x..] [--seed-file f]` | XbSymbolDatabase patterns matched as data; checkout outside the repo |
+| `tools/xbedis.py <xbe> <addr or name> [n]` | capstone disassembly naming known addresses (capstone in a virtual environment, run with its interpreter and `-I`) |
+| `out/build/release/xbe_symbols.exe` | the SDK's scanner; with the 4831 set copied as `<tmp>/4361` it gives the "sig"/"k=" finds |
 
 ## Local paths (not in FINDINGS.md)
 - The disc image: `E:\OG-xbox-recomps\Hunter - The Reckoning (USA).xiso.iso`; the extracted
-  `E:\OG-xbox-recomps\hunter-xbe\default.xbe`. Read-only; never commit them. Extract into
-  `assets/` with `python -I tools/xiso.py <iso> extract assets` before the first build.
+  `E:\OG-xbox-recomps\hunter-xbe\default.xbe`. Read-only; never commit them. `assets/` holds the
+  extracted disc (ignored).
 - For M5 later: the SDK runtime's kernel, XDK and gpu shader code already compile on Linux
   through `sdk/harness` (headless). Windows-only are `runtime/app/*`, `gpu/d3d12.cpp`,
   `audio/xaudio2.cpp` and the ImGui win32/dx12 backends; `cmake/XbeRecomp.cmake` uses lld-link

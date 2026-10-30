@@ -28,6 +28,32 @@ XAPILIB, D3D8, DSOUND, DMUSIC, XBOXKRNL, LIBCMT, D3DX8, XGRAPHC. The SDK has sig
 layouts for 4831 and 5849 only (`sdk/xdk/`), and `xbe_symbols` picks the set by the D3D8 or
 XAPILIB build, so it stops on this XBE. See PLAN.md, M0.
 
+### The XDK functions and data the host replaces
+`config/game.toml` was made in three passes (2026-10-28):
+1. `xbe_symbols` with the 4831 signatures copied under a 4361 folder name: 70 of 248 functions,
+   6 of 13 data. 15 of those matched by constants only; each is labelled with its score.
+2. XbSymbolDatabase's OOVPA patterns (MIT code, ODbL database, not vendored) read as data by a
+   Python matcher that mirrors the library's automatic scan; run outside the repo. It agrees with
+   `xbe_symbols` on all 46 functions both found, and adds 60, 12 of which it found only once
+   seeded with the device pointer and the step 1 results. (Since then the matcher also tests
+   overlapping offsets, as the library does; that adds five `IDirectSoundStream_*` jump stubs
+   into `CDirectSoundStream_*` functions and changes no other match.)
+3. By hand: `XInputGetCapabilities` dropped (the constants match at `0x25DB04` is device-open
+   code; `XInputOpen` is `0x25900D`); `D3D_pDevice` `0x212E70` and `D3D_DirtyFlags` `0x20FC28`
+   read from the D3D code.
+
+Result: 129 of 248 functions (69 from step 1 after step 3's drop, 60 from step 2), 8 of 13
+data. Of the 119 at 0, 37 are networking and Xbox Live
+names (Hunter links no XNET library); the rest are not found yet or not linked.
+
+### XDK 4361 data layout
+`config/xdk/4361/layout.toml`, every key proven at an address in Hunter's D3D, DSOUND and XPP
+code. Many device offsets differ from 4831, for example the textures (`0xA78` vs `0xB38`), the
+transforms (`0x750` vs `0x810`) and the render target (`0x2070` vs `0x21B4`); the relative layout
+of the surfaces (render target, depth, back, front, auto depth) is the same. 4361 keeps one pending
+gamma index (`+0x2A8C`) where 4831 keeps a flag per ramp, so `CDevice_GammaPending` has no 4361
+value and gamma changes need a hook.
+
 ### Sections
 | Name | VA | Virtual size | Notes |
 |---|---|---|---|

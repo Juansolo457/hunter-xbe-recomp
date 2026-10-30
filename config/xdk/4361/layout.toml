@@ -1,0 +1,49 @@
+# XDK 4361 library data layouts the runtime reads or writes, in the format of sdk/xdk/4831/layout.toml.
+# Each value is proven by Hunter: The Reckoning's default.xbe (title 56550007) code at the address given.
+# Keys left out are unknown for 4361 and trap where the runtime first needs them (sdk/runtime/xdk/layout.h);
+# the ones still missing are listed at the end.
+[layout]
+# D3D8 CDevice, the static device at 0x210390 (Direct3D_CreateDevice 0x205A43 stores it in D3D__pDevice 0x212E70)
+CDevice_Push              = 0x0    # D3DDevice_SetRenderState_StencilEnable 0x201A07 reads it, 0x201A09 compares with +4
+CDevice_PushThreshold     = 0x4    # the same compare; D3D_SetFence 0x205ED9 too, then calls D3D_MakeRequestedSpace
+CDevice_BaseVertex        = 0x1C   # D3DDevice_SetIndices 0x203CD9 stores BaseVertexIndex
+CDevice_IndexBuffer       = 0x38C  # D3DDevice_SetIndices 0x203CAA reads the old one, 0x203CD2 stores the new one
+CDevice_ZScale            = 0x450  # D3D_UpdateProjectionViewportTransform 0x200CD6 scales MaxZ - MinZ by it
+CDevice_SuperSampleX      = 0x458  # D3D_UpdateProjectionViewportTransform 0x200C86 scales the viewport width by it
+CDevice_SuperSampleY      = 0x45C  # D3D_UpdateProjectionViewportTransform 0x200CAC scales the viewport height by it
+CDevice_Transforms        = 0x750  # D3DDevice_SetTransform 0x202926 copies 16 dwords to +0x750 + type * 64
+CDevice_Textures          = 0xA78  # D3DDevice_SetTexture 0x203A80 reads [stage]
+CDevice_Palettes          = 0xA88  # D3DDevice_SetPalette 0x203BFD reads, 0x203C35 stores [stage]
+CDevice_RenderTarget      = 0x2070 # D3DDevice_GetRenderTarget 0x2035F5 returns it
+CDevice_Depth             = 0x2074 # D3DDevice_GetDepthStencilSurface 0x203615 returns it
+CDevice_BackBuffer        = 0x207C # the device init 0x2098D9 sets it as the render target, with the auto depth buffer
+CDevice_FrontBuffer       = 0x2080 # the Swap helper 0x2026E3 fences the surface just presented from it
+CDevice_AutoDepth         = 0x2088 # the device init 0x2098D3 sets it as the depth buffer beside the back buffer
+CDevice_SwapCount         = 0x2AC4 # D3DDevice_Swap 0x202766 increments it, 0x202780 returns it
+CDevice_Size              = 0x2AE0 # Direct3D_CreateDevice 0x205A81 clears 0xAB8 dwords of the device on failure
+CDevice_Flags             = 0x8    # Direct3D_CreateDevice 0x205A2F reads it, 0x205A3E ors BehaviorFlags & 0x10 in, 0x205A59 stores
+CDevice_PixelShader       = 0x370  # D3DDevice_SetPixelShader 0x2084D4 stores the handle
+CDevice_Viewport          = 0x9D0  # D3DDevice_SetViewport 0x20373B to 0x20375F stores X, Y, Width, Height, MinZ, MaxZ
+CDevice_ScreenSpaceOffset = 0x9E8  # D3DDevice_SetScreenSpaceOffset 0x203FC3 stores x + the offset, 0x203FD3 y at +4
+CDevice_VBlankEvent       = 0x2434 # D3DDevice_BlockUntilVerticalBlank 0x202AA7 waits on it, 0x202A9B clears its SignalState
+CDevice_GammaRamps        = 0x2484 # D3DDevice_SetGammaRamp 0x202820 copies 0x300 bytes to +0x2484 + index * 0x300
+# D3D8 globals
+DirtyFlags_Texture        = 0x4800 # D3DDevice_SetTexture 0x203AF5 ors it into D3D__DirtyFlags 0x20FC28
+TextureState_Stage        = 32     # D3DDevice_SetTextureState_TexCoordIndex 0x20130D: stage * 128 bytes, 32 dwords
+Stream_Size               = 12     # D3DDevice_SetStreamSource 0x204F6A indexes the stream table by n * 12
+Stream_Stride             = 0x0    # D3DDevice_SetStreamSource 0x204FB2 stores Stride
+Stream_Buffer             = 0x8    # D3DDevice_SetStreamSource 0x204FB8 stores the vertex buffer
+PixelShader_Definition    = 0x8    # D3DDevice_SetPixelShader 0x20853B reads [handle + 8]
+# DSOUND
+CDirectSoundStream_Vtable  = 0x0   # CDirectSoundStream constructor 0x215BD9 stores the first vtable
+CDirectSoundStream_Vtable2 = 0x4   # CDirectSoundStream constructor 0x215BD2 stores the second vtable
+# XAPI XPP device type record
+XPP_Current               = 0x0    # XGetDevices 0x2591A8 returns it
+XPP_Changed               = 0x4    # XGetDevices 0x2591AA clears it, XGetDeviceChanges 0x2591C8 tests it
+XPP_Previous              = 0x8    # XGetDevices 0x2591B0 copies Current into it
+
+# Not known for 4361 yet:
+# CDevice_GammaPending   4361 keeps one pending index at +0x2A8C (D3DDevice_SetGammaRamp 0x202836), where the
+#                        runtime expects a flag per ramp: needs a hook, not a key
+# CDevice_VertexShader, CDevice_Time, CDevice_BackBufferScale, CDevice_VBlankCallback, CDevice_DisplayFlags,
+# CDevice_VBlankCount, CDevice_Field, EffectsImage_Skip0, EffectsImage_Skip1, EffectsImage_Desc
