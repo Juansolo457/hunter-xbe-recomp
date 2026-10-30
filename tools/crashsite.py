@@ -4,8 +4,10 @@
 
 Reads the dump's exception record (or takes the host address given), finds the module it is in, and for
 the code DLL the nearest export at or below it: the recompiled functions are exported as
-__imp__sub_<guest address>. Read-only; stdlib only.
+__imp__sub_<guest address>. The DLL must be the build the crash ran with: its image size, checksum
+and link time are checked against the dump's module. Read-only; stdlib only.
 """
+import ntpath
 import os
 import struct
 import sys
@@ -30,8 +32,8 @@ def modules(d):
         if kind == 4:  # ModuleListStream
             n = struct.unpack_from('<I', d, at)[0]
             for i in range(n):
-                base, size, _ck, _ts, name = struct.unpack_from('<QIIII', d, at + 4 + i * 108)
-                yield base, size, utf16(d, name)
+                base, size, ck, ts, name = struct.unpack_from('<QIIII', d, at + 4 + i * 108)
+                yield base, size, ck, ts, utf16(d, name)
 
 
 def exception_address(d):
@@ -42,8 +44,15 @@ def exception_address(d):
     return None, None
 
 
-def exports(dll):
-    p = open(dll, 'rb').read()
+def identity(p):
+    """The PE fields a minidump records for a module: image size, checksum, link time."""
+    pe = struct.unpack_from('<I', p, 0x3C)[0]
+    opt = pe + 24
+    return (struct.unpack_from('<I', p, opt + 56)[0], struct.unpack_from('<I', p, opt + 64)[0],
+            struct.unpack_from('<I', p, pe + 8)[0])
+
+
+def exports(p):
     pe = struct.unpack_from('<I', p, 0x3C)[0]
     nsec = struct.unpack_from('<H', p, pe + 6)[0]
     opt = pe + 24
@@ -82,13 +91,21 @@ def main():
         addr = int(sys.argv[3], 16)
     print(f'exception {code:#010x} at {addr:#x}' if code is not None else f'address {addr:#x}')
     dll_name = os.path.basename(sys.argv[2]).lower()
-    for base, size, name in modules(d):
+    for base, size, ck, ts, name in modules(d):
         if base <= addr < base + size:
             print(f'in {name} + {addr - base:#x}')
-            if os.path.basename(name).lower() == dll_name:
+            # the dump holds a Windows path, whatever this runs on
+            if ntpath.basename(name).lower() == dll_name:
+                p = open(sys.argv[2], 'rb').read()
+                have = identity(p)
+                if have != (size, ck, ts):
+                    print(f'{sys.argv[2]} is not the build the crash ran with (size, checksum, link time '
+                          f'{have[0]:#x} {have[1]:#x} {have[2]:#x}, the dump has {size:#x} {ck:#x} {ts:#x}); '
+                          'its exports would name the wrong function')
+                    return 1
                 rva = addr - base
                 best = None
-                for f_rva, f_name in exports(sys.argv[2]):
+                for f_rva, f_name in exports(p):
                     if f_rva <= rva:
                         best = (f_rva, f_name)
                 if best:

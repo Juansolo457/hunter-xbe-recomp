@@ -11,8 +11,8 @@ hit. Order, as with GRAW: **Windows D3D12 first** with the SDK as it ships, then
 Deck through Proton**, then **native Linux with Vulkan**. Pull requests reviewed by CodeRabbit
 later (the user installs the GitHub app; not yet). House rules as in the sibling recomps:
 master protected, source-only releases, never commit game data, commit as
-`juansolo457 <5344231+Juansolo457@users.noreply.github.com>`. Builds and test windows are free in
-this repo; never close a game the user is running.
+`juansolo457 <5344231+Juansolo457@users.noreply.github.com>`. Ask the user before any build or
+test run (since 2026-10-29); never close a game the user is running.
 
 The first session (2026-10-27) started Linux-first; the user corrected the order on 2026-10-28
 after an internet outage mixed up two sessions. The docs follow the corrected order.
@@ -22,9 +22,10 @@ after an internet outage mixed up two sessions. The docs follow the corrected or
 rendered correctly, smooth (user, 2026-10-28). Weapon and enemy sounds were silent (DirectMusic's
 clock, step 12): fixed and confirmed by the user 2026-10-29. No known bugs in what has been played.**
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
-  Everything so far came in through three stacked PRs, merged in order at the user's request
-  (2026-10-29): #1 `bootstrap`, #2 `m0-first-build` (the first build), #3 `m1-boot` (this boot
-  work). CodeRabbit reviews PRs; each PR's threads were fixed or answered before its merge.
+  Everything so far came in through three stacked PRs, merged in order at the user's request:
+  #1 `bootstrap` and #2 `m0-first-build` (the first build) on 2026-10-29 local time (2026-10-30
+  UTC on GitHub), then #3 `m1-boot`, this boot work, which carries this file. CodeRabbit reviews
+  every PR into master; each one's threads are fixed or answered before it merges.
 - `config/game.toml`: 156 of 268 XDK functions and 11 of 13 data addresses, each labelled with where it
   came from (`tools/make_config.py` writes it; FINDINGS.md). 112 names are at 0: 37 are
   networking names Hunter doesn't link, the rest not found or not called yet.
@@ -66,9 +67,8 @@ Each stop, its cause and the fix, in order:
     SetConeAngles, SetConeOrientation, SetConeOutsideVolume, SetMode; stream SetLFO, SetEG,
     SetAllParameters and the three cone setters. All added to the runtime (LFOs and cones as
     no-ops, as the envelope and filter already are; SetMode and stream SetAllParameters keep the
-    3D state). **SetNotificationPositions' events are never signalled** (the runtime has no
-    position notifications): if the synth's music or streams stall, start there. With this the
-    user got past the game mode to the character select.
+    3D state). SetNotificationPositions' events were not signalled yet at this step; step 12
+    added that. With this the user got past the game mode to the character select.
 11. **Torn characters** (limbs, eyes, silhouettes in the wrong place; the user's screenshot, 2026-10-28):
     Hunter skins characters with the fixed function pipeline: FVF `0x116` (one blend weight), the
     engine's skinning setup `0x15F3E0` maps 2 3 4 bones to D3DRS_VERTEXBLEND 1 3 5 (table `0x2769AC`)
@@ -102,7 +102,10 @@ Each stop, its cause and the fix, in order:
   lists each draw's blend mode and world translations.
 - The 4361 overlay itself (`config/xdk/4361/layout.toml`, signatures still to sign).
 
-Unchanged here, to report (from CodeRabbit's review of PR #1):
+Unchanged here, to report (from CodeRabbit's reviews):
+- The recompiler models no segment registers: reads give 0, writes are dropped, FS addressing goes
+  through `fs_base`. So `push ds` pushes 0, not the console's selector. Step 6 fixed only the slot
+  size; the one code met (Bink's CPU check) pushes and pops in pairs and never reads the slots.
 - `tools/sdk_sync/sdk_sync.py` reads `overrides` from the top level of a game's `sdk.toml`, but
   `set_pin` writes it under `[sdk]`, where it is ignored; `set_pin` also updates only `version`,
   never `commit`. This repo keeps `overrides` at the top level and updates `commit` by hand.
@@ -141,7 +144,10 @@ out\build\release\Hunter.exe                 # finds assets/ in a folder above i
   depends on `config/*.toml` and the SDK's xdk files, not the overlay.
 - `CMakeLists.txt` copies `config/xdk/` into the compiler folder (the first-launch compile reads
   it) and refreshes `Hunter.dll`'s time after the exe links, so a host-only change doesn't make the
-  exe rebuild its code at start.
+  exe rebuild its code at start. That holds for `build.bat`'s DLL, which has no stamp. Once a
+  first-launch build has written `built.txt` in the compiler's work folder, the stamp (the exe's
+  size and time and the xbe's SHA-1) decides instead (`sdk/runtime/app/game_code.cpp`, `Current`),
+  so any relink of the exe rebuilds the code at the next start.
 
 ## Tools
 | | |
