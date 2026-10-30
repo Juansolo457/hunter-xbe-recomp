@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <map>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "audio/audio.h"
@@ -234,6 +235,7 @@ struct Voice {
     // last checked at: an event is set when the play cursor passes its offset, DSBPN_OFFSETSTOP ones when it stops
     std::vector<std::pair<uint32_t, uint32_t>> notify;
     uint32_t notify_at = 0;
+    uint32_t laps = 0;  // times the cursor wrapped its loop in the block being mixed, for its notifications
     bool is3d = false;
     uint32_t mode = 0;  // DS3DMODE: 1 head relative, 2 disabled
     float p[3] = {}, min_dist = 1, max_dist = 1e9f;
@@ -633,6 +635,7 @@ std::optional<Cursor> BufferFrame(Voice& v) {
             v.pos = 0;
             return std::nullopt;
         }
+        v.laps += uint32_t((v.pos - start) / double(end - start));
         v.pos = start + std::fmod(v.pos - start, double(end - start));
         f = uint32_t(v.pos);
     }
@@ -708,16 +711,20 @@ void Signal(uint32_t handle) {
     if (ObjectRef o = FromHandle(handle)) SetEvent(*o);
 }
 
-// sets the events whose offsets the cursor passed going from notify_at to now, across the loop's wrap when now is behind
-void PassNotifications(Voice& v, uint32_t now) {
-    if (v.notify.empty() || now == v.notify_at) return;
+// sets the events whose offsets the cursor passed going from notify_at to now in a block that wrapped the loop laps
+// times: with a wrap, on to the loop's end and from its start to now, or the whole loop when it wrapped again, so a
+// block that plays a whole loop or more passes every offset in it, even one that ends on the byte it began at
+void PassNotifications(Voice& v, uint32_t now, uint32_t laps) {
     uint32_t was = v.notify_at;
+    v.notify_at = now;
+    if (v.notify.empty() || (!laps && now == was)) return;
+    uint32_t lo = v.play_start + v.loop_start, hi = lo + v.loop_len;
     for (const auto& [off, event] : v.notify) {
         if (off == kOffsetStop) continue;
-        bool passed = now > was ? off > was && off <= now : off > was || off <= now;
+        bool passed = !laps ? off > was && off <= now
+                            : (off > was && off <= hi) || (off >= lo && off <= (laps > 1 ? hi : now));
         if (passed) Signal(event);
     }
-    v.notify_at = now;
 }
 
 // the buffer stopped: the offsets up to the end of its play region, then the DSBPN_OFFSETSTOP events
@@ -742,7 +749,9 @@ void Render(float* out, uint32_t frames) {
         if (v.paused || v.sync || (!v.stream && !v.playing)) continue;
         MixVoice(v, bins.data(), frames);
         if (v.stream) continue;
-        if (v.playing) PassNotifications(v, NotifyBytes(v));
+        BufferFrame(v);  // a cursor that ran off the end in the block's last frame wraps or stops now, not a block later
+        uint32_t laps = std::exchange(v.laps, 0);
+        if (v.playing) PassNotifications(v, NotifyBytes(v), laps);
         else StopNotifications(v, true);  // played to the end of its region
     }
     if (dsp::Loaded()) dsp::Run(bins.data(), frames);

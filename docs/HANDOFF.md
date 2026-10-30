@@ -1,4 +1,4 @@
-# Handoff: Hunter: The Reckoning (original Xbox) (2026-10-28, boots to the menu)
+# Handoff: Hunter: The Reckoning (original Xbox) (2026-10-30, plays on Windows; first Steam Deck build)
 
 State file. The next model starts here, not from chat history. Update it at the end of every
 session. Goals, decisions and milestones: [PLAN.md](PLAN.md). Disc and XBE facts:
@@ -24,8 +24,9 @@ clock, step 12): fixed and confirmed by the user 2026-10-29. No known bugs in wh
 - GitHub: https://github.com/Juansolo457/hunter-xbe-recomp (public), master locked (below).
   Everything so far came in through three stacked PRs, merged in order at the user's request:
   #1 `bootstrap` and #2 `m0-first-build` (the first build) on 2026-10-29 local time (2026-10-30
-  UTC on GitHub), then #3 `m1-boot`, this boot work, which carries this file. CodeRabbit reviews
-  every PR into master; each one's threads are fixed or answered before it merges.
+  UTC on GitHub), then #3 `m1-boot`, this boot work, which carries this file. #4
+  `dsound-loop-notify` (2026-10-30): position notifications across whole loops (step 13). CodeRabbit
+  reviews every PR into master; each one's threads are fixed or answered before it merges.
 - `config/game.toml`: 156 of 268 XDK functions and 11 of 13 data addresses, each labelled with where it
   came from (`tools/make_config.py` writes it; FINDINGS.md). 112 names are at 0: 37 are
   networking names Hunter doesn't link, the rest not found or not called yet.
@@ -86,6 +87,16 @@ Each stop, its cause and the fix, in order:
     the play cursor passes their offsets (and DSBPN_OFFSETSTOP ones on stop); IDirectSoundStream create,
     SetMode, SetMaxDistance, SetMinDistance, SetMixBinVolumes added. **The user confirmed the sound is
     fixed (2026-10-29).**
+13. **Position notifications across a whole loop** (CodeRabbit on PR #3, fixed 2026-10-30): `Render`
+    signalled the offsets between the cursor before and after a block, so a looping buffer that played
+    a whole loop or more in one block missed the offsets in between (all of them when it ended on the
+    byte it began at). `BufferFrame` now counts the block's loop wraps and `PassNotifications` signals
+    on to the loop's end and from its start after one wrap, the whole loop after more. A cursor that
+    runs off the end in a block's last frame now wraps (or stops) right after the block, so offsets at
+    the loop's start no longer fire a block late. Checked against a frame-by-frame cursor simulation
+    (496,787 offset checks, none wrong; the old rule got 185,933 wrong) and a clean 60 s run. The gap
+    was never heard, and that run (the attract demo) set no notification positions at all, so the
+    new path itself is checked by the simulation only so far.
 
 ## SDK changes to offer upstream (TGP482/XboxXBE-Recomp)
 `sdk/` was unchanged until this work; every change here is portable and game-agnostic:
@@ -95,8 +106,8 @@ Each stop, its cause and the fix, in order:
 - `runtime/xdk/dsound.cpp`: `IDirectSoundBuffer_AddRef`, `IDirectSoundBuffer_SetPitch`,
   `CDirectSoundStream_SetPitch`, `CDirectSoundStream_SetOutputBuffer`, `IDirectSound_SetAllParameters`,
   and the twelve buffer and stream methods of step 10; `IDirectSound_CreateSoundStream`, stream SetMode;
-  `DirectSoundGetSampleTime` from the mixer's sample count; SetNotificationPositions events; the
-  `XBE_AUDIO_LOG` diagnostic.
+  `DirectSoundGetSampleTime` from the mixer's sample count; SetNotificationPositions events, counted
+  across loop wraps (step 13); the `XBE_AUDIO_LOG` diagnostic.
 - `runtime/gpu/shaders.cpp`, `shaders.h`, `d3d12.cpp`, `render_thread.cpp`: fixed function vertex blending
   (D3DRS_VERTEXBLEND 1 to 6) and the four world matrices reaching the render thread; the F3 capture
   lists each draw's blend mode and world translations.
@@ -119,13 +130,9 @@ Unchanged here, to report (from CodeRabbit's reviews):
 2. Gamma: 4361 keeps one pending gamma index (`+0x2A8C`), the runtime expects a flag per ramp;
    gamma changes are not applied yet.
 3. DirectMusic now plays (step 12); the WMA decoder and Dolby sections: not met yet.
-4. **Position notifications across a whole loop** (CodeRabbit on PR #3): `Render` signals the
-   offsets between the cursor before and after a block (`PassNotifications` in
-   `sdk/runtime/xdk/dsound.cpp`). If a looping buffer plays a whole loop or more in one block, the
-   cursor ends on or past where it started and the offsets crossed in between are missed (none at
-   all when it ends on the same byte). Fix: count the bytes a block advanced and signal every offset
-   when that reaches the loop's length. Not seen in play (the sound works); needs a build and a test
-   run, so it waits for the user's OK.
+4. **Steam Deck (M3)**: the first Proton test build went to the Deck on 2026-10-30 (below). Next:
+   the user's report, then the logs pulled over SSH. The copy was made by hand; a push helper
+   script is M3's other half.
 
 ## Debugging
 - Release builds log only errors and Report lines (`NDEBUG`); `out/build/debug` (preset `debug`,
@@ -176,8 +183,22 @@ out\build\release\Hunter.exe                 # finds assets/ in a folder above i
   and .def files.
 
 ## Steam Deck
-Do not set up or test the Deck SSH path until a first build is ready to be played. Deck details
-are in memory `steam-deck-ssh` when that time comes; the Deck runs the Windows build in Proton.
+The Deck runs the Windows build in Proton (the D3D12 renderer through vkd3d-proton). SSH details
+are in memory `steam-deck-ssh`. The first test build (2026-10-30, branch `dsound-loop-notify`) is in
+`/home/deck/recomps/Hunter-SteamDeck/`: `Hunter.exe`, `Hunter.dll`, `Hunter.pdb`, `compiler/` without
+its work folder, the extracted disc in `assets/`, the Visual C++ runtime and Microsoft's
+`d3dcompiler_47.dll` from the Windows SDK's Redist folder (Proton's own is a reimplementation), a Deck
+`settings.toml` (borderless at the screen's size), `README-SteamDeck.txt` (the Steam setup) and
+`VERSION.txt`. It holds game data: it stays on the Deck and the PC.
+- How it was copied: `tar --exclude=compiler/work -cf - -C out/build/release Hunter.exe Hunter.dll
+  Hunter.pdb compiler -C ../../.. assets | ssh deck@steamdeck 'tar -C ~/recomps/Hunter-SteamDeck -xf -'`,
+  then the small files from a staging folder.
+- **Touch `Hunter.dll` after copying.** The exe and the DLL are linked in the same second and tar
+  keeps whole seconds, so the DLL would no longer be newer than the exe (`Current` in
+  `sdk/runtime/app/game_code.cpp`) and the first start would try to rebuild the game code.
+- Launch options: `WINEDLLOVERRIDES="msvcp140,vcruntime140,vcruntime140_1,d3dcompiler_47=n,b" %command%`,
+  so the copies beside the exe load instead of Proton's.
+- Logs after a run: `logs/hunter.log` (replaced at each start) and `CrashDumps/` in that folder.
 
 ## Master lock (day 1, non-negotiable)
 Applied right after the first push: `required_status_checks: {strict: true, contexts:
