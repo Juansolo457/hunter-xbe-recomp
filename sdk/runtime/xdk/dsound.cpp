@@ -5,6 +5,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <deque>
+#include <cstdlib>
 #include <map>
 #include <optional>
 #include <vector>
@@ -85,6 +86,86 @@ X86Func* Find(uint32_t guest);
 #define SYM_IDirectSoundBuffer_SetEG FFFFFF0E
 #define HAS_IDirectSoundBuffer_SetEG 0
 #endif
+#ifndef SYM_IDirectSoundBuffer_AddRef
+#define SYM_IDirectSoundBuffer_AddRef FFFFFF0F
+#define HAS_IDirectSoundBuffer_AddRef 0
+#endif
+#ifndef SYM_IDirectSound_SetAllParameters
+#define SYM_IDirectSound_SetAllParameters FFFFFF10
+#define HAS_IDirectSound_SetAllParameters 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetOutputBuffer
+#define SYM_CDirectSoundStream_SetOutputBuffer FFFFFF11
+#define HAS_CDirectSoundStream_SetOutputBuffer 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetPitch
+#define SYM_IDirectSoundBuffer_SetPitch FFFFFF12
+#define HAS_IDirectSoundBuffer_SetPitch 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetPitch
+#define SYM_CDirectSoundStream_SetPitch FFFFFF13
+#define HAS_CDirectSoundStream_SetPitch 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetLFO
+#define SYM_IDirectSoundBuffer_SetLFO FFFFFF14
+#define HAS_IDirectSoundBuffer_SetLFO 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetNotificationPositions
+#define SYM_IDirectSoundBuffer_SetNotificationPositions FFFFFF15
+#define HAS_IDirectSoundBuffer_SetNotificationPositions 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetConeAngles
+#define SYM_IDirectSoundBuffer_SetConeAngles FFFFFF16
+#define HAS_IDirectSoundBuffer_SetConeAngles 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetConeOrientation
+#define SYM_IDirectSoundBuffer_SetConeOrientation FFFFFF17
+#define HAS_IDirectSoundBuffer_SetConeOrientation 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetConeOutsideVolume
+#define SYM_IDirectSoundBuffer_SetConeOutsideVolume FFFFFF18
+#define HAS_IDirectSoundBuffer_SetConeOutsideVolume 0
+#endif
+#ifndef SYM_IDirectSoundBuffer_SetMode
+#define SYM_IDirectSoundBuffer_SetMode FFFFFF19
+#define HAS_IDirectSoundBuffer_SetMode 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetLFO
+#define SYM_CDirectSoundStream_SetLFO FFFFFF1A
+#define HAS_CDirectSoundStream_SetLFO 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetEG
+#define SYM_CDirectSoundStream_SetEG FFFFFF1B
+#define HAS_CDirectSoundStream_SetEG 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetAllParameters
+#define SYM_CDirectSoundStream_SetAllParameters FFFFFF1C
+#define HAS_CDirectSoundStream_SetAllParameters 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetConeAngles
+#define SYM_CDirectSoundStream_SetConeAngles FFFFFF1D
+#define HAS_CDirectSoundStream_SetConeAngles 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetConeOrientation
+#define SYM_CDirectSoundStream_SetConeOrientation FFFFFF1E
+#define HAS_CDirectSoundStream_SetConeOrientation 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetConeOutsideVolume
+#define SYM_CDirectSoundStream_SetConeOutsideVolume FFFFFF1F
+#define HAS_CDirectSoundStream_SetConeOutsideVolume 0
+#endif
+#ifndef SYM_IDirectSound_CreateSoundStream
+#define SYM_IDirectSound_CreateSoundStream FFFFFF20
+#define HAS_IDirectSound_CreateSoundStream 0
+#endif
+#ifndef SYM_CDirectSoundStream_SetMode
+#define SYM_CDirectSoundStream_SetMode FFFFFF21
+#define HAS_CDirectSoundStream_SetMode 0
+#endif
+#ifndef SYM_DirectSoundGetSampleTime
+#define SYM_DirectSoundGetSampleTime FFFFFF22
+#define HAS_DirectSoundGetSampleTime 0
+#endif
 
 namespace {
 
@@ -149,6 +230,10 @@ struct Voice {
     uint8_t nbins = 0, bin[8] = {};
     int32_t bin_mb[32] = {};  // by mix bin
     std::vector<float> curve;  // rolloff
+    // DSBPOSITIONNOTIFY pairs (byte offset in the buffer, event handle) by offset, and the byte position they were
+    // last checked at: an event is set when the play cursor passes its offset, DSBPN_OFFSETSTOP ones when it stops
+    std::vector<std::pair<uint32_t, uint32_t>> notify;
+    uint32_t notify_at = 0;
     bool is3d = false;
     uint32_t mode = 0;  // DS3DMODE: 1 head relative, 2 disabled
     float p[3] = {}, min_dist = 1, max_dist = 1e9f;
@@ -194,6 +279,8 @@ void ForgetBlocks(Voice& v) {
 }
 
 float Db(int32_t hundredths) { return hundredths <= -10000 ? 0.0f : std::pow(10.0f, hundredths / 2000.0f); }
+// DSound pitch: log2 of the playback rate over 48 kHz in 1/4096 steps (XAudioCalculatePitch's inverse)
+uint32_t PitchToFrequency(int32_t pitch) { return uint32_t(std::lround(48000.0 * std::exp2(pitch / 4096.0))); }
 
 uint32_t FramesOf(const Voice& v, uint32_t bytes) {
     if (v.tag == 0x69) return bytes / (36u * v.channels) * 64;  // WAVE_FORMAT_XBOX_ADPCM
@@ -607,13 +694,56 @@ void MixVoice(Voice& v, float* bins, uint32_t frames) {
     v.itd = itd;
 }
 
+// position notifications (SetNotificationPositions). The DirectMusic synth refills its sink buffers when they fire.
+constexpr uint32_t kOffsetStop = 0xFFFFFFFF;  // DSBPN_OFFSETSTOP
+
+// samples the output has taken at 48 kHz: the APU's sample counter DirectSoundGetSampleTime reads, and with it
+// DirectMusic's reference clock, which schedules everything it plays
+std::atomic<uint32_t> g_sample_time{0};
+
+// the play cursor as a byte offset in the buffer, as DSBPOSITIONNOTIFY counts it
+uint32_t NotifyBytes(const Voice& v) { return v.play_start + BytesOf(v, uint32_t(v.pos)); }
+
+void Signal(uint32_t handle) {
+    if (ObjectRef o = FromHandle(handle)) SetEvent(*o);
+}
+
+// sets the events whose offsets the cursor passed going from notify_at to now, across the loop's wrap when now is behind
+void PassNotifications(Voice& v, uint32_t now) {
+    if (v.notify.empty() || now == v.notify_at) return;
+    uint32_t was = v.notify_at;
+    for (const auto& [off, event] : v.notify) {
+        if (off == kOffsetStop) continue;
+        bool passed = now > was ? off > was && off <= now : off > was || off <= now;
+        if (passed) Signal(event);
+    }
+    v.notify_at = now;
+}
+
+// the buffer stopped: the offsets up to the end of its play region, then the DSBPN_OFFSETSTOP events
+void StopNotifications(Voice& v, bool reached_end) {
+    if (v.notify.empty()) return;
+    if (reached_end) {
+        uint32_t end = v.play_start + v.play_len;
+        for (const auto& [off, event] : v.notify)
+            if (off != kOffsetStop && off > v.notify_at && off <= end) Signal(event);
+    }
+    for (const auto& [off, event] : v.notify)
+        if (off == kOffsetStop) Signal(event);
+    v.notify_at = NotifyBytes(v);
+}
+
 void Render(float* out, uint32_t frames) {
+    g_sample_time.fetch_add(frames, std::memory_order_relaxed);
     static std::vector<float> bins;  // the output thread alone renders
     bins.assign(size_t(frames) * kBins, 0.0f);
     std::lock_guard<std::recursive_mutex> lock(g_lock);
     for (auto& [obj, v] : g_voices) {
         if (v.paused || v.sync || (!v.stream && !v.playing)) continue;
         MixVoice(v, bins.data(), frames);
+        if (v.stream) continue;
+        if (v.playing) PassNotifications(v, NotifyBytes(v));
+        else StopNotifications(v, true);  // played to the end of its region
     }
     if (dsp::Loaded()) dsp::Run(bins.data(), frames);
     for (uint32_t i = 0; i < frames; i++) {
@@ -654,6 +784,12 @@ void Start() {
 }
 
 // WAVEFORMATEX
+// XBE_AUDIO_LOG set: voices logged as they play (LogPlay) at the level release builds keep
+bool AudioLog() {
+    static const bool on = std::getenv("XBE_AUDIO_LOG") != nullptr;
+    return on;
+}
+
 void ReadFormat(Voice& v, uint32_t wfx) {
     if (!wfx) return;
     v.tag = R16(wfx);
@@ -662,6 +798,7 @@ void ReadFormat(Voice& v, uint32_t wfx) {
     v.align = std::max<uint16_t>(R16(wfx + 12), 1);
     v.bits = R16(wfx + 14);
     if (v.tag != 1 && v.tag != 0x69) LOG_FIRST(8, "dsound: format tag %X not supported", v.tag);
+    if (v.tag != 1 && v.tag != 0x69 && AudioLog()) LOGR("audio: format tag %X not supported (%u channels, %u bits)", v.tag, v.channels, v.bits);
 }
 
 // DSMIXBINS: the voice's bins and their volumes
@@ -741,6 +878,10 @@ static void AuditExports() {
         SYM(IDirectSoundBuffer_SetFormat), SYM(IDirectSoundBuffer_SetOutputBuffer), SYM(IDirectSoundBuffer_SetRolloffCurve),
         SYM(IDirectSoundBuffer_StopEx), SYM(IDirectSoundBuffer_Pause), SYM(IDirectSoundBuffer_SetEG),
         SYM(XAudioDownloadEffectsImage), SYM(DirectSoundCreateBuffer), SYM(IDirectSound_CreateSoundBuffer),
+        SYM(IDirectSoundBuffer_AddRef), SYM(IDirectSound_SetAllParameters), SYM(CDirectSoundStream_SetOutputBuffer),
+        SYM(IDirectSoundBuffer_SetPitch), SYM(CDirectSoundStream_SetPitch),
+        SYM(IDirectSoundBuffer_SetLFO), SYM(IDirectSoundBuffer_SetNotificationPositions), SYM(IDirectSoundBuffer_SetConeAngles), SYM(IDirectSoundBuffer_SetConeOrientation), SYM(IDirectSoundBuffer_SetConeOutsideVolume), SYM(IDirectSoundBuffer_SetMode),
+        SYM(CDirectSoundStream_SetLFO), SYM(CDirectSoundStream_SetEG), SYM(CDirectSoundStream_SetAllParameters), SYM(CDirectSoundStream_SetConeAngles), SYM(CDirectSoundStream_SetConeOrientation), SYM(CDirectSoundStream_SetConeOutsideVolume),
         SYM(IDirectSoundBuffer_Release), SYM(IDirectSoundBuffer_Unlock), SYM(IDirectSoundBuffer_SetBufferData),
         SYM(IDirectSoundBuffer_Play), SYM(IDirectSoundBuffer_Stop), SYM(IDirectSoundBuffer_SetLoopRegion),
         SYM(IDirectSoundBuffer_GetStatus), SYM(IDirectSoundBuffer_GetCurrentPosition), SYM(IDirectSoundBuffer_SetCurrentPosition),
@@ -748,7 +889,8 @@ static void AuditExports() {
         SYM(IDirectSoundBuffer_SetFilter), SYM(IDirectSoundBuffer_SetHeadroom), SYM(IDirectSoundBuffer_SetMixBinVolumes),
         SYM(IDirectSoundBuffer_SetMixBins), SYM(IDirectSoundBuffer_SetMaxDistance), SYM(IDirectSoundBuffer_SetMinDistance),
         SYM(IDirectSoundBuffer_SetPosition), SYM(IDirectSoundBuffer_SetVelocity), SYM(IDirectSoundBuffer_SetI3DL2Source),
-        SYM(DirectSoundCreateStream), SYM(CDirectSoundStream_AddRef), SYM(CDirectSoundStream_SetFormat),
+        SYM(DirectSoundCreateStream), SYM(IDirectSound_CreateSoundStream), SYM(CDirectSoundStream_SetMode), SYM(DirectSoundGetSampleTime),
+        SYM(CDirectSoundStream_AddRef), SYM(CDirectSoundStream_SetFormat),
         SYM(CDirectSoundStream_Release), SYM(CDirectSoundStream_GetInfo), SYM(CDirectSoundStream_GetStatus),
         SYM(CDirectSoundStream_Process), SYM(CDirectSoundStream_Discontinuity), SYM(CDirectSoundStream_Flush),
         SYM(CDirectSoundStream_FlushEx), SYM(CDirectSoundStream_Pause), SYM(CDirectSoundStream_SetVolume),
@@ -839,6 +981,20 @@ HLE_STDCALL(IDirectSound_SetOrientation, 8) {
     }
     return 0;
 }
+// (this, DS3DLISTENER, apply): dwSize, position, velocity, front, top, distance, rolloff and doppler factors; the
+// position and orientation as their own setters keep them, the rest unused as theirs are
+HLE_STDCALL(IDirectSound_SetAllParameters, 3) {
+    std::lock_guard<std::recursive_mutex> lock(g_lock);
+    for (int i = 0; i < 3; i++) {
+        g_listener[i] = F32(R32(a[1] + 0x04 + i * 4));
+        g_front[i] = F32(R32(a[1] + 0x1C + i * 4));
+        g_top[i] = F32(R32(a[1] + 0x28 + i * 4));
+    }
+    return 0;
+}
+// the APU's sample counter; the library reads it from the hardware only for its own DirectSound object, which the
+// host replaces, and returned 0, which stopped DirectMusic's clock (no music cues or effects played through it)
+HLE_STDCALL(DirectSoundGetSampleTime, 0) { return g_sample_time.load(std::memory_order_relaxed); }
 HLE_STDCALL(DirectSoundDoWork, 0) {
     g_pumped = NowMs();
     std::vector<Done> done;
@@ -936,6 +1092,20 @@ HLE_STDCALL(IDirectSound_GetOutputLevels, 3) {
 HLE_STDCALL(DirectSoundCreateBuffer, 2) { return NewBuffer(a[0], a[1]); }
 HLE_STDCALL(IDirectSound_CreateSoundBuffer, 4) { return NewBuffer(a[1], a[2]); }
 
+// XBE_AUDIO_LOG set: each voice's first plays and what they play with, at the level release builds keep
+void LogPlay(const char* what, const Voice& v) {
+    if (!AudioLog()) return;
+    static std::map<uint32_t, int> seen;
+    if (seen[v.obj]++ >= 3) return;
+    float d[3] = {v.p[0] - g_listener[0], v.p[1] - g_listener[1], v.p[2] - g_listener[2]};
+    float dist = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    LOGR("audio: %s %08X tag %X %uch %uHz %ubit %u bytes, 3d %d mode %u dist %.1f (min %.1f max %.1f att %.3f) "
+         "vol %.3f headroom %.3f freq %u bins %u [%u %u %u %u]",
+         what, v.obj, v.tag, v.channels, v.rate, v.bits, v.bytes, v.is3d, v.mode, dist, v.min_dist, v.max_dist,
+         v.is3d && v.mode != 2 ? Attenuation(v, v.mode == 1 ? std::sqrt(Dot(v.p, v.p)) : dist) : 1.0f, v.volume,
+         v.headroom, v.freq, v.nbins, v.bin[0], v.bin[1], v.bin[2], v.bin[3]);
+}
+
 #define BUFFER(name, nargs)                                 \
     static uint32_t buf_##name(Voice& v, const Args& a);    \
     HLE_STDCALL(IDirectSoundBuffer_##name, nargs) {         \
@@ -945,6 +1115,8 @@ HLE_STDCALL(IDirectSound_CreateSoundBuffer, 4) { return NewBuffer(a[1], a[2]); }
     }                                                       \
     static uint32_t buf_##name([[maybe_unused]] Voice& v, [[maybe_unused]] const Args& a)
 
+// the library's AddRef calls through the console object's vtable, which a host buffer does not have
+BUFFER(AddRef, 1) { return uint32_t(++v.refs); }
 BUFFER(Release, 1) {
     if (--v.refs > 0) return uint32_t(v.refs);
     if (v.owned) mem::FreeContiguous(v.owned);
@@ -975,14 +1147,18 @@ BUFFER(Play, 4) {
     v.looping = a[3] & 1;
     if (a[3] & 2) v.pos = 0;
     v.sync = a[3] & 4;
+    v.notify_at = NotifyBytes(v);
+    LogPlay("buffer play", v);
     return 0;
 }
 BUFFER(Stop, 1) {
+    if (v.playing) StopNotifications(v, false);
     v.playing = false;
     return 0;
 }
 // (this, time low, time high, flags): stops now, the release envelope is not reproduced
 BUFFER(StopEx, 4) {
+    if (v.playing) StopNotifications(v, false);
     v.playing = false;
     return 0;
 }
@@ -1001,6 +1177,7 @@ BUFFER(SetPlayRegion, 3) {
     v.play_len = v.loop_len = a[2] ? a[2] : v.bytes - a[1];
     v.loop_start = 0;
     v.pos = 0;
+    v.notify_at = NotifyBytes(v);
     ForgetBlocks(v);
     return 0;
 }
@@ -1022,6 +1199,7 @@ BUFFER(GetCurrentPosition, 3) {
 }
 BUFFER(SetCurrentPosition, 2) {
     v.pos = FramesOf(v, a[1]);
+    v.notify_at = NotifyBytes(v);
     return 0;
 }
 BUFFER(Lock, 8) {
@@ -1042,6 +1220,32 @@ BUFFER(SetVolume, 2) {
 }
 BUFFER(SetFrequency, 2) {
     v.freq = a[1];
+    return 0;
+}
+BUFFER(SetPitch, 2) {
+    v.freq = PitchToFrequency(int32_t(a[1]));
+    return 0;
+}
+// LFOs and cones are not modelled, as the envelope and filter are not (SetEG, SetFilter)
+BUFFER(SetLFO, 2) { return 0; }
+BUFFER(SetConeAngles, 4) { return 0; }
+BUFFER(SetConeOrientation, 5) { return 0; }
+BUFFER(SetConeOutsideVolume, 3) { return 0; }
+// (this, mode, apply): DS3DMODE, as SetAllParameters keeps it
+BUFFER(SetMode, 3) {
+    v.mode = a[1];
+    return 0;
+}
+// (this, count, DSBPOSITIONNOTIFY array): offset and event handle pairs, kept by offset as the library does; none clears
+BUFFER(SetNotificationPositions, 3) {
+    v.notify.clear();
+    for (uint32_t i = 0; i < a[1] && a[2]; i++) v.notify.emplace_back(R32(a[2] + i * 8), R32(a[2] + i * 8 + 4));
+    std::sort(v.notify.begin(), v.notify.end());
+    v.notify_at = NotifyBytes(v);
+    if (AudioLog()) {
+        LOGR("audio: SetNotificationPositions %08X %u positions, first at %u, %u bytes", v.obj, a[1],
+             v.notify.empty() ? 0 : v.notify[0].first, v.bytes);
+    }
     return 0;
 }
 BUFFER(SetFilter, 2) { return 0; }
@@ -1095,12 +1299,12 @@ BUFFER(SetFormat, 2) {
 
 // streams, the object carries the XDK's own vtable
 
-HLE_STDCALL(DirectSoundCreateStream, 2) {
+// a stream for DSSTREAMDESC desc, its object stored at out
+uint32_t NewStream(uint32_t desc, uint32_t out) {
     XDK_REQUIRE("dsound", XDK_KEY(CDirectSoundStream_Vtable), XDK_KEY(CDirectSoundStream_Vtable2),
                 XDK_DATA(DSound_StreamVtable), XDK_DATA(DSound_StreamVtable2));
     std::lock_guard<std::recursive_mutex> lock(g_lock);
     Start();
-    uint32_t desc = a[0];
     uint32_t obj = mem::AllocSystem(0x80);
     std::memset(HostPtr(obj), 0, 0x80);
     W32(obj + XDK_CDirectSoundStream_Vtable, kStreamVtable);
@@ -1116,9 +1320,12 @@ HLE_STDCALL(DirectSoundCreateStream, 2) {
     SetBins(v, R32(desc + 20));
     v.is3d = flags & 0x10;  // DSBCAPS_CTRL3D
     v.headroom = DefaultHeadroom(flags);
-    W32(a[1], obj);
+    W32(out, obj);
     return 0;
 }
+HLE_STDCALL(DirectSoundCreateStream, 2) { return NewStream(a[0], a[1]); }
+// (this, desc, stream, unknown), as the buffers' IDirectSound_CreateSoundBuffer
+HLE_STDCALL(IDirectSound_CreateSoundStream, 4) { return NewStream(a[1], a[2]); }
 
 #define STREAM(name, nargs)                                     \
     static uint32_t str_##name(Voice& v, const Args& a);        \
@@ -1187,6 +1394,7 @@ STREAM(Process, 3) {
     if (pk.completed_ptr) W32(pk.completed_ptr, 0);
     if (pk.status_ptr) W32(pk.status_ptr, kPacketPending);
     v.packets.push_back(pk);
+    if (!v.active) LogPlay("stream starts", v);
     if (!v.active) v.has_gain = false;  // after going quiet a stream starts its levels fresh
     v.active = true;
     v.ending = false;
@@ -1219,6 +1427,27 @@ STREAM(SetFrequency, 2) {
     v.freq = a[1];
     return 0;
 }
+STREAM(SetPitch, 2) {
+    v.freq = PitchToFrequency(int32_t(a[1]));
+    return 0;
+}
+STREAM(SetLFO, 2) { return 0; }
+STREAM(SetEG, 2) { return 0; }
+// (this, DS3DBUFFER, apply), as the buffer's
+STREAM(SetAllParameters, 3) {
+    for (int i = 0; i < 3; i++) v.p[i] = F32(R32(a[1] + 4 + i * 4));
+    v.min_dist = F32(R32(a[1] + 0x34));
+    v.max_dist = F32(R32(a[1] + 0x38));
+    v.mode = R32(a[1] + 0x3C);
+    return 0;
+}
+STREAM(SetConeAngles, 4) { return 0; }
+STREAM(SetConeOrientation, 5) { return 0; }
+STREAM(SetConeOutsideVolume, 3) { return 0; }
+STREAM(SetMode, 3) {
+    v.mode = a[1];
+    return 0;
+}
 STREAM(SetFilter, 2) { return 0; }
 // the library's own writes voice registers a host stream does not have; envelopes are not played
 HLE_STDCALL(IDirectSoundStream_SetEG, 2) { return 0; }
@@ -1230,6 +1459,7 @@ STREAM(SetMixBinVolumes, 2) {
     SetBinVolumes(v, a[1]);
     return 0;
 }
+STREAM(SetOutputBuffer, 2) { return 0; }  // the voice keeps its own mix bins, as a buffer's does
 STREAM(SetMixBins, 2) {
     SetBins(v, a[1]);
     return 0;

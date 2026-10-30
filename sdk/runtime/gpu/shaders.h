@@ -52,6 +52,8 @@ struct FixedKey {
                            // diffuse, specular, ambient, emissive (material when the vertex lacks that colour)
     uint32_t types = 0;    // D3DLIGHTTYPE per light, 2 bits each, 0 off
     uint32_t tex[4] = {};  // per stage: coordinate set, texgen at bit 4, D3DTTFF count at bit 8, projected bit 11, set size at bit 12
+    uint32_t blend = 0;    // D3DRS_VERTEXBLEND (D3DVBF): 1 3 5 blend 2 3 4 world matrices, the last weight implied;
+                           // 2 4 6 the same with every weight given; 0 off. Weights in v1
 };
 FixedKey MakeFixedKey(const State& s);
 std::string FixedVertexHlsl(uint16_t regs, bool pretransformed, uint64_t decode = 0, const FixedKey& f = {});
@@ -105,6 +107,11 @@ struct DrawConstants {
     float lt[8][7][4];   // per light: diffuse, specular, ambient, position range, direction falloff, attenuation, cos theta/2 phi/2
     float rtshift[4];    // per kTexTarget stage: host pixels its reads move along x and y, negative up and left
     float zparams[4];    // ReversedDepthHlsl: a w buffer's scale (0 for a z buffer), its far w, the polygon offset
+    // fixed function vertex blending (FixedKey::blend): world 1 to 3 times view, their normal matrices, and the
+    // projection with the viewport the blended view space positions take
+    float wvb[3][16];
+    float wvnb[3][16];
+    float projvp[16];
 };
 
 }  // namespace gpu

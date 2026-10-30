@@ -30,8 +30,9 @@ approving review; reviewing every pull request (CodeRabbit's, below) is this pro
 ## The SDK
 
 `sdk/` is a copy of [XboxXBE-Recomp](https://github.com/TGP482/XboxXBE-Recomp) pinned in
-`sdk.toml`, kept as upstream ships it until the native Linux phase. Updating it from upstream is
-a pull request of its own. Hunter's XDK 4361 data lives in `config/xdk/4361/` and goes upstream
+`sdk.toml`. Changes to it are made only for XDK 4361 support or SDK bugs, keep other titles
+working, and are listed in `docs/HANDOFF.md` for upstreaming. Updating the copy from upstream is a
+pull request of its own. Hunter's XDK 4361 data lives in `config/xdk/4361/` and goes upstream
 as a pull request once complete.
 
 ## Releases

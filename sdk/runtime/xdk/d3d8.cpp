@@ -113,6 +113,49 @@ constexpr uint32_t kDevPush = XDK_CDevice_Push, kDevThreshold = XDK_CDevice_Push
                    kDevPalettes = XDK_CDevice_Palettes;
 constexpr uint32_t kStageStates = XDK_TextureState_Stage, kStreamSize = XDK_Stream_Size;
 
+// The title's render state numbering. gpu::State numbers them as 4831 and 5849 do; XDKs before 4627 lack
+// DepthClipControl, StippleEnable, PresentationInterval, SampleAlpha and the unused slots, so their table is
+// shorter and its blocks start lower. Three layout keys say where the title's deferred states, complex states
+// and the states after SampleAlpha start; without them the numbering is the host's.
+constexpr uint32_t kGuestDeferred =
+    XDK_RenderState_Deferred != xdk::kUnknown ? XDK_RenderState_Deferred : gpu::kRsDeferredFirst;
+constexpr uint32_t kGuestComplex =
+    XDK_RenderState_Complex != xdk::kUnknown ? XDK_RenderState_Complex : gpu::kRsComplexFirst;
+constexpr uint32_t kGuestDxt1 =
+    XDK_RenderState_Dxt1NoiseEnable != xdk::kUnknown ? XDK_RenderState_Dxt1NoiseEnable : gpu::kRsDxt1NoiseEnable;
+constexpr uint32_t kGuestRsMax = kGuestDxt1 + (gpu::kRsMax - gpu::kRsDxt1NoiseEnable);
+constexpr uint32_t kNoGuestRs = 0xFFFFFFFFu;
+static_assert(kGuestDeferred <= gpu::kRsDeferredFirst && kGuestComplex - kGuestDeferred <= gpu::kRsComplexFirst - gpu::kRsDeferredFirst &&
+                  kGuestDxt1 - kGuestComplex <= gpu::kRsDxt1NoiseEnable - gpu::kRsComplexFirst,
+              "the title's render state blocks must fit the host's");
+
+// a title index to the host's
+constexpr uint32_t HostRs(uint32_t g) {
+    if (g < kGuestDeferred) return g;
+    if (g < kGuestComplex) return gpu::kRsDeferredFirst + (g - kGuestDeferred);
+    if (g < kGuestDxt1) return gpu::kRsComplexFirst + (g - kGuestComplex);
+    return gpu::kRsDxt1NoiseEnable + (g - kGuestDxt1);
+}
+
+// a host index to the title's, kNoGuestRs for a state its XDK does not have
+constexpr uint32_t GuestRs(uint32_t h) {
+    if (h < gpu::kRsDeferredFirst) return h < kGuestDeferred ? h : kNoGuestRs;
+    if (h < gpu::kRsComplexFirst) {
+        uint32_t d = h - gpu::kRsDeferredFirst;
+        return d < kGuestComplex - kGuestDeferred ? kGuestDeferred + d : kNoGuestRs;
+    }
+    if (h < gpu::kRsDxt1NoiseEnable) {
+        uint32_t c = h - gpu::kRsComplexFirst;
+        return c < kGuestDxt1 - kGuestComplex ? kGuestComplex + c : kNoGuestRs;
+    }
+    return kGuestDxt1 + (h - gpu::kRsDxt1NoiseEnable);
+}
+static_assert(HostRs(GuestRs(gpu::kRsFogEnable)) == gpu::kRsFogEnable &&
+                  HostRs(GuestRs(gpu::kRsPsTextureModes)) == gpu::kRsPsTextureModes &&
+                  HostRs(GuestRs(gpu::kRsDxt1NoiseEnable)) == gpu::kRsDxt1NoiseEnable &&
+                  GuestRs(gpu::kRsMax - 1) == kGuestRsMax - 1,
+              "HostRs and GuestRs must invert each other");
+
 gpu::State g_state;
 std::unique_ptr<gpu::Backend> g_backend;
 std::recursive_mutex g_lock;
@@ -209,7 +252,8 @@ uint32_t NewSurface(uint32_t w, uint32_t h, uint32_t fmt, uint32_t bpp) {
 
 void SyncDeferred() {
     // deferred states live in the title's memory, the inline SetRenderState and SetTextureStageState write them
-    for (uint32_t i = gpu::kRsDeferredFirst; i < gpu::kRsComplexFirst; i++) g_state.rs[i] = R32(kRenderState + i * 4);
+    for (uint32_t i = gpu::kRsDeferredFirst; i < gpu::kRsComplexFirst; i++)
+        if (uint32_t g = GuestRs(i); g != kNoGuestRs) g_state.rs[i] = R32(kRenderState + g * 4);
     for (int s = 0; s < 4; s++)
         for (uint32_t i = 0; i < gpu::kTssBumpEnvMat00; i++) g_state.tss[s][i] = R32(kTextureState + (s * kStageStates + i) * 4);
 }
@@ -244,7 +288,7 @@ void UpdateViewportConstants() {
 
 void SetComplex(uint32_t rs, uint32_t v) {
     g_state.rs[rs] = v;
-    W32(kRenderState + rs * 4, v);
+    if (uint32_t g = GuestRs(rs); g != kNoGuestRs) W32(kRenderState + g * 4, v);
 }
 
 // The library's default render and texture stage states; its pushes land in the scratch buffer
@@ -295,6 +339,9 @@ void SetFrameBuffers(const char* caller, uint32_t pp) {
     SetDev(kDevDepth, g_depth);
     SetDev(kDevBackBuffer, g_buffers[1]);
     SetDev(kDevFrontBuffer, g_buffers[1]);
+    // these frame buffers are never multisampled: D3DMULTISAMPLE_NONE (one sample across, one down), which a
+    // title divides the back buffer's size by
+    if (XDK_CDevice_MultiSampleType != xdk::kUnknown) SetDev(XDK_CDevice_MultiSampleType, 0x11);
     float one = 1.0f, zs = g_depth && (R32(g_depth + 12) >> 8 & 0xFF) == 0x30 ? 65535.0f : 16777215.0f;
     std::memcpy(HostPtr(kDevice + kDevSuperX), &one, 4);
     std::memcpy(HostPtr(kDevice + kDevSuperY), &one, 4);
@@ -696,13 +743,13 @@ HLE_FASTCALL(D3DDevice_SetRenderState_Simple, 0) {
 }
 
 HLE_STDCALL(D3DDevice_SetRenderStateNotInline, 2) {
-    uint32_t rs = a[0], v = a[1];
-    if (rs < gpu::kRsDeferredFirst) {
+    uint32_t rs = a[0], v = a[1];  // the title's numbering
+    if (rs < kGuestDeferred) {
         uint32_t method = R32(kSimpleEncode + rs * 4) & 0x1FFC;
         SetSimple(method, v);
         W32(kRenderState + rs * 4, v);  // titles read their states back from the library's table
-    } else if (rs < gpu::kRsMax) {
-        SetComplex(rs, v);
+    } else if (rs < kGuestRsMax) {
+        SetComplex(HostRs(rs), v);
     }
     return 0;
 }

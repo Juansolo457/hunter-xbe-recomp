@@ -42,9 +42,22 @@ XAPILIB build, so it stops on this XBE. See PLAN.md, M0.
    code; `XInputOpen` is `0x25900D`); `D3D_pDevice` `0x212E70` and `D3D_DirtyFlags` `0x20FC28`
    read from the D3D code.
 
-Result: 129 of 248 functions (69 from step 1 after step 3's drop, 60 from step 2), 8 of 13
-data. Of the 119 at 0, 37 are networking and Xbox Live
-names (Hunter links no XNET library); the rest are not found yet or not linked.
+Result after M0: 129 of 248 functions (69 from step 1 after step 3's drop, 60 from step 2), 8 of
+13 data, 119 at 0. The boot work (2026-10-28 and 29, HANDOFF.md) added 28 functions and three data
+addresses by hand, each with its proof: 20 are names the SDK's list lacked (mostly the DirectSound
+methods the runtime now replaces), 8 were at 0. It set `IDirectSoundBuffer_SetRolloffCurve` back
+to 0: the SDK's byte signature matched the SetConeAngles wrapper (thin wrappers differ only in their
+masked call target, so a signature alone can't tell them apart; check the callee). Now 156 of 268
+functions, 11 of 13 data; of the 112 at 0, 37 are networking and Xbox Live (Hunter links no XNET
+library), the rest not found yet or not called.
+
+### Render state numbering
+4361 has 146 render states where 4831 has 166: no DepthClipControl, StippleEnable,
+PresentationInterval, SampleAlpha or the unused slots. Deferred states start at 82 (4831: 92),
+complex at 117 (136), and the states after SampleAlpha's slot at 139 (159). Proven in
+`SetRenderStateNotInline` (`0x200C05`: below 82 simple, `0x200C29`: below 117 deferred), by 19
+`SetRenderState_*` setters agreeing on the table base `0x20FE30`, and by `D3D_InitDefaultState`
+setting states 57 to 145. Texture stage states are numbered as in 4831.
 
 ### XDK 4361 data layout
 `config/xdk/4361/layout.toml`, every key proven at an address in Hunter's D3D, DSOUND and XPP

@@ -22,7 +22,7 @@ The Xbox Hunter: The Reckoning running natively, its x86 code translated to C++ 
   draw distance are 1.0 features.
 - **CodeRabbit reviews every pull request**; `master` is locked like the other recomps.
 - **Source only.** No release ships the game's code; players build from their own disc.
-- **Builds and test windows are free in this repo** while debugging; never close the user's
+- **Ask the user before any build or test run** (since 2026-10-29); never close the user's
   running game.
 
 ## Architecture
@@ -39,7 +39,7 @@ config/xdk/4361   the XDK layout and signatures the SDK lacks for this build
 | # | Milestone | Done when |
 |---|---|---|
 | M0 | **XDK 4361 and the first build** (built 2026-10-28; the open symbols carry into M1) | `config/xdk/4361/layout.toml` with every key proven in Hunter's code; `config/game.toml` complete (every symbol the 4831 set names found in Hunter or proven absent); the overlay wired into the build; `Hunter.exe` links. Signatures for upstream are still to sign |
-| M1 | **Boot on Windows** | The title reaches its front end menu; kernel and XDK gaps (DirectMusic, WMA, Dolby sections, Bink) handled |
+| M1 | **Boot on Windows** (in progress: the front end, a new game, characters and sound work, the user confirmed 2026-10-29; DirectMusic and Bink handled, the WMA decoder and Dolby sections not met yet) | The title reaches its front end menu; kernel and XDK gaps (DirectMusic, WMA, Dolby sections, Bink) handled |
 | M2 | **Playable on Windows (0.1)** | The game plays through: levels, saves, co-op on one PC |
 | M3 | **Steam Deck through Proton** | A push-over-SSH helper; the user plays on the Deck; Deck issues fixed in the Windows build |
 | M4 | **007 parity (1.0)** | Mouse and keyboard, texture replacement, HDR, draw distance and the other 007 options that suit Hunter |
@@ -51,4 +51,5 @@ config/xdk/4361   the XDK layout and signatures the SDK lacks for this build
   Hunter's code, not assumed.
 - **Libraries the SDK hasn't met:** DirectMusic (linked, use unproven), the WMA decoder and the
   Dolby encoder sections, Bink inside `.text`. Each needs HLE or must be proven harmless.
-- **The SDK is young (0.1.0).** Keep `sdk/` unchanged so upstream updates drop in.
+- **The SDK is young (0.1.0).** Keep `sdk/` changes few, portable and listed (HANDOFF.md), so
+  they go upstream and upstream updates still drop in.

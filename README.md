@@ -22,8 +22,9 @@ The route, as with [graw360-recomp](https://github.com/Juansolo457/graw360-recom
 
 ## Status
 
-**Builds, doesn't boot yet.** Hunter is built on XDK 4361, which the SDK doesn't ship; this repo
-carries the 4361 layout as an overlay. `Hunter.exe` builds on Windows and stops in D3D setup.
+**Playable on Windows, early.** The intro movies, menus and a new game work, characters render
+correctly and it runs smoothly; play past the first areas, saves and co-op are untested. Hunter is built on XDK 4361, which the SDK doesn't ship: this
+repo carries the 4361 layout as an overlay and a few SDK fixes meant for upstream.
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, where things live, next steps
@@ -38,7 +39,7 @@ Hunter: The Reckoning (USA), `default.xbe` title id `56550007`, SHA-1
 ## Layout
 
 ```
-sdk/        XboxXBE-Recomp (MIT), vendored as shipped
+sdk/        XboxXBE-Recomp (MIT), vendored, with XDK 4361 fixes for upstream
 config/     game.toml: the recompiler's input for default.xbe; xdk/4361: the XDK overlay
 src/        host code: common/ (game info, options), game/ (hooks over recompiled functions)
 tools/      disc and XBE readers, the repository audit

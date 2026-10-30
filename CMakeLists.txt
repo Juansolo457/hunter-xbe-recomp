@@ -39,3 +39,17 @@ endif()
 
 # target name = GAME_EXE in build.bat, xbe = GAME_XBE
 add_xbe_image(Hunter default.xbe game.toml ${GAME_PARTITIONS} game)
+
+# The XDK 4361 overlay (config/xdk/4361, included by config/game.toml) goes beside the config the first-launch
+# compiler reads, so a release and a stale DLL rebuild find it; the SDK copies only config/*.toml.
+add_custom_command(TARGET compiler_files POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/config/xdk ${XBE_COMPILER_DIR}/config/xdk
+    VERBATIM)
+# the recompile step depends on config/*.toml only: after editing the overlay, touch config/game.toml
+
+# The executable takes its code DLL for current only when the DLL is newer (sdk/runtime/app/game_code.cpp). A
+# change to host code alone relinks the executable and leaves the DLL as it was, which would then be rebuilt at
+# the next start: mark the existing DLL current again. Ninja still relinks it when its own inputs change.
+add_custom_command(TARGET Hunter POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E touch_nocreate $<TARGET_FILE_DIR:Hunter>/Hunter.dll
+    VERBATIM)

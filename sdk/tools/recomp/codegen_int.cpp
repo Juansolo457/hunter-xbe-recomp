@@ -416,7 +416,11 @@ bool CodeGen::EmitInteger(uint32_t va, const ZydisDecodedInstruction& in, const 
         case ZYDIS_MNEMONIC_STD: Line("\tctx.df = 1;"); return true;
 
         case ZYDIS_MNEMONIC_PUSH:
-            if (ops[0].size == 16 && ops[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) {
+            // a segment register takes a 4 byte slot in 32 bit code, as its pop does (Bink's CPU check pushes ds and es)
+            if (ops[0].type == ZYDIS_OPERAND_TYPE_REGISTER && ops[0].reg.value >= ZYDIS_REGISTER_ES &&
+                ops[0].reg.value <= ZYDIS_REGISTER_GS && in.operand_width == 32) {
+                emit(F("uint32_t v = (uint32_t)(%s); X86_PUSH32(v);", Read(ops[0], ea).c_str()));
+            } else if (ops[0].size == 16 && ops[0].type != ZYDIS_OPERAND_TYPE_IMMEDIATE) {
                 emit(F("uint16_t v = (uint16_t)(%s); ctx.esp -= 2; X86_MEM16(ctx.esp) = v;", Read(ops[0], ea).c_str()));
             } else {
                 emit(F("uint32_t v = (uint32_t)(%s); X86_PUSH32(v);", Read(ops[0], ea).c_str()));

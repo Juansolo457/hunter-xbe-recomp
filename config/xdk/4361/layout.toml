@@ -18,6 +18,7 @@ CDevice_RenderTarget      = 0x2070 # D3DDevice_GetRenderTarget 0x2035F5 returns 
 CDevice_Depth             = 0x2074 # D3DDevice_GetDepthStencilSurface 0x203615 returns it
 CDevice_BackBuffer        = 0x207C # the device init 0x2098D9 sets it as the render target, with the auto depth buffer
 CDevice_FrontBuffer       = 0x2080 # the Swap helper 0x2026E3 fences the surface just presented from it
+CDevice_MultiSampleType   = 0x205C # Get2DSurfaceDesc 0x209FC2 reports it as the back buffer's MultiSampleType
 CDevice_AutoDepth         = 0x2088 # the device init 0x2098D3 sets it as the depth buffer beside the back buffer
 CDevice_SwapCount         = 0x2AC4 # D3DDevice_Swap 0x202766 increments it, 0x202780 returns it
 CDevice_Size              = 0x2AE0 # Direct3D_CreateDevice 0x205A81 clears 0xAB8 dwords of the device on failure
@@ -25,8 +26,20 @@ CDevice_Flags             = 0x8    # Direct3D_CreateDevice 0x205A2F reads it, 0x
 CDevice_PixelShader       = 0x370  # D3DDevice_SetPixelShader 0x2084D4 stores the handle
 CDevice_Viewport          = 0x9D0  # D3DDevice_SetViewport 0x20373B to 0x20375F stores X, Y, Width, Height, MinZ, MaxZ
 CDevice_ScreenSpaceOffset = 0x9E8  # D3DDevice_SetScreenSpaceOffset 0x203FC3 stores x + the offset, 0x203FD3 y at +4
-CDevice_VBlankEvent       = 0x2434 # D3DDevice_BlockUntilVerticalBlank 0x202AA7 waits on it, 0x202A9B clears its SignalState
+CDevice_VBlankEvent       = 0x2434 # D3DDevice_BlockUntilVerticalBlank 0x202AA7 waits on it, 0x202A9B clears its SignalState;
+                                   # the vertical blank handler 0x20AA78 sets it at miniport + 0x1CC (miniport = device + 0x2268)
+CDevice_VBlankCallback    = 0x2430 # the vertical blank handler 0x20AA7E loads [miniport + 0x1C8], 0x20AAD4 calls it with
+                                   # {count, swaps, flag}
+CDevice_VBlankCount       = 0x2460 # the vertical blank handler 0x20A9A6 increments miniport + 0x1F8, 0x20A9BF stores it
+CDevice_Field             = 0x2474 # the vertical blank handler 0x20AA39 stores the field at miniport + 0x20C
 CDevice_GammaRamps        = 0x2484 # D3DDevice_SetGammaRamp 0x202820 copies 0x300 bytes to +0x2484 + index * 0x300
+# D3D8 render state numbering (4361 lacks DepthClipControl, StippleEnable, PresentationInterval, SampleAlpha
+# and the unused slots; sdk/runtime/xdk/layout.h)
+RenderState_Deferred      = 82     # D3DDevice_SetRenderStateNotInline 0x200C05: below 0x52 the simple encode table
+RenderState_Complex       = 117    # D3DDevice_SetRenderStateNotInline 0x200C29: below 0x75 the deferred states;
+                                   # D3DDevice_SetRenderState_PSTextureModes stores D3D_RenderState + 117 * 4
+RenderState_Dxt1NoiseEnable = 139  # D3DDevice_SetRenderState_Dxt1NoiseEnable stores D3D_RenderState + 139 * 4
+                                   # (0x21005C); 19 complex setters agree on the base with these blocks
 # D3D8 globals
 DirtyFlags_Texture        = 0x4800 # D3DDevice_SetTexture 0x203AF5 ors it into D3D__DirtyFlags 0x20FC28
 TextureState_Stage        = 32     # D3DDevice_SetTextureState_TexCoordIndex 0x20130D: stage * 128 bytes, 32 dwords
@@ -37,6 +50,9 @@ PixelShader_Definition    = 0x8    # D3DDevice_SetPixelShader 0x20853B reads [ha
 # DSOUND
 CDirectSoundStream_Vtable  = 0x0   # CDirectSoundStream constructor 0x215BD9 stores the first vtable
 CDirectSoundStream_Vtable2 = 0x4   # CDirectSoundStream constructor 0x215BD2 stores the second vtable
+EffectsImage_Skip0         = 0x804 # 0x2179BD (reached from CDirectSound_DownloadEffectsImage 0x213165 via 0x217C11) adds this dword count
+EffectsImage_Skip1         = 0x80C # 0x2179B7 loads this dword count
+EffectsImage_Desc          = 0x818 # 0x2179C6: descriptor at image + 0x818 + (Skip0 + Skip1) * 4
 # XAPI XPP device type record
 XPP_Current               = 0x0    # XGetDevices 0x2591A8 returns it
 XPP_Changed               = 0x4    # XGetDevices 0x2591AA clears it, XGetDeviceChanges 0x2591C8 tests it
@@ -45,5 +61,4 @@ XPP_Previous              = 0x8    # XGetDevices 0x2591B0 copies Current into it
 # Not known for 4361 yet:
 # CDevice_GammaPending   4361 keeps one pending index at +0x2A8C (D3DDevice_SetGammaRamp 0x202836), where the
 #                        runtime expects a flag per ramp: needs a hook, not a key
-# CDevice_VertexShader, CDevice_Time, CDevice_BackBufferScale, CDevice_VBlankCallback, CDevice_DisplayFlags,
-# CDevice_VBlankCount, CDevice_Field, EffectsImage_Skip0, EffectsImage_Skip1, EffectsImage_Desc
+# CDevice_VertexShader, CDevice_Time, CDevice_BackBufferScale, CDevice_DisplayFlags

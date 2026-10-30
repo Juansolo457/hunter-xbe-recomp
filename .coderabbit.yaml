@@ -24,9 +24,10 @@ reviews:
   path_instructions:
     - path: "sdk/**"
       instructions: >
-        This is a vendored copy of TGP482's XboxXBE-Recomp SDK (MIT), kept as upstream ships it
-        until the native Linux phase. Flag any change here that is not an upstream sync, and
-        anything game-specific that belongs in src/ or config/ instead. Thread safety matters:
+        This is a vendored copy of TGP482's XboxXBE-Recomp SDK (MIT). Changes are made here only
+        for XDK 4361 support or SDK bugs, must keep other titles working (4831/5849 defaults),
+        stay free of Hunter specifics (those belong in src/ or config/) and be listed in
+        docs/HANDOFF.md for upstreaming. Thread safety matters:
         the game runs its own threads through the kernel layer, and the renderer has a thread of
         its own.
     - path: "src/**"

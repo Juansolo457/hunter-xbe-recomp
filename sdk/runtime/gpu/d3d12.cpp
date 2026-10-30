@@ -2331,6 +2331,20 @@ void FillTransformConstants(const State& s, GuestExtent size, DrawConstants& c) 
     InverseTranspose3x3(wv, n);
     Transpose(n, c.wvn);
     for (int t = 0; t < 4; t++) Transpose(s.transforms[kTsTexture0 + size_t(t)].data(), c.tm[t]);
+    // vertex blending: worlds 1 to 3 into view space, then the projection and viewport on the blended position
+    if (s.rs[kRsVertexBlend]) {
+        for (int k = 0; k < 3; k++) {
+            float m[16];
+            MatMul(s.transforms[kTsWorld + 1 + size_t(k)].data(), s.transforms[kTsView].data(), m);
+            Transpose(m, c.wvb[k]);
+            float mn[16] = {};
+            InverseTranspose3x3(m, mn);
+            Transpose(mn, c.wvnb[k]);
+        }
+        float pv[16];
+        MatMul(s.transforms[kTsProjection].data(), vpm, pv);
+        Transpose(pv, c.projvp);
+    }
 }
 
 // D3DLIGHT8 as floats: Type, Diffuse[4], Specular[4], Ambient[4], Position[3], Direction[3], Range, Falloff,
@@ -2519,6 +2533,12 @@ void D3D12Backend::CaptureDraw(const State& s, uint32_t prim, uint32_t count, co
             cap_i_++, s.rt.data, bound_ds_ ? s.zs.data : 0, prim, count, s.vs_handle, s.ps ? s.ps->handle : 0, k.blend,
             k.src, k.dst, k.zen, k.zfunc, k.zwrite, k.zbias, k.zslope, k.cull, k.wmask, c.pc[0][0], c.pc[0][1],
             c.pc[0][2], c.pc[0][3]);
+    // fixed function vertex blending and where each world matrix puts the origin
+    fprintf(cap_, " vblend %u", s.rs[kRsVertexBlend]);
+    for (size_t w = 0; w < 4; w++) {
+        const auto& m = s.transforms[256 + w];
+        fprintf(cap_, " w%zu (%.2f %.2f %.2f)", w, m[12], m[13], m[14]);
+    }
     CaptureTextures(s, stages);
 }
 

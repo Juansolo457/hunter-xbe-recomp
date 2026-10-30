@@ -55,6 +55,9 @@ const char* kCommonTail = R"(    float4 spread[4];
     float4 lt[56];
     float4 rtshift;
     float4 zparams;
+    float4x4 wvb[3];
+    float4x4 wvnb[3];
+    float4x4 projvp;
 };
 )";
 
@@ -755,6 +758,7 @@ FixedKey MakeFixedKey(const State& s) {
         }
         f.tex[t] = set | ((tci >> 16) & 7) << 4 | (ttf & 7) << 8 | (ttf & 0x100 ? 0x800 : 0) | size << 12;
     }
+    if (s.rs[kRsVertexBlend] >= 1 && s.rs[kRsVertexBlend] <= 6) f.blend = s.rs[kRsVertexBlend];
     return f;
 }
 
@@ -772,9 +776,27 @@ std::string FixedVertexHlsl(uint16_t regs, bool pretransformed, uint64_t decode,
         s += "    oPos = float4(rhw.xy, rhw.z / surf.z, w);\n";
     } else {
         s += "    float4 ip = float4(" + v(0, "float4(0,0,0,1)") + ".xyz, 1);\n";
-        s += "    float4 cp = mul(ip, wvp);\n";
-        s += "    float3 vp = mul(ip, wv).xyz;\n";
-        s += "    float3 vn = mul(float4(" + v(2, "float4(0,0,0,0)") + ".xyz, 0), wvn).xyz;\n";
+        if (f.blend) {
+            // the console's skinning: position and normal through 2 to 4 world matrices weighted by v1, the last
+            // weight 1 less the others for the odd modes, summed in view space, then projected
+            int mats = int(f.blend + 1) / 2 + 1;
+            bool implied = f.blend & 1;
+            s += "    float4 bw = " + v(1, "float4(0,0,0,0)") + ";\n";
+            s += "    float4 in_n = float4(" + v(2, "float4(0,0,0,0)") + ".xyz, 0);\n";
+            s += "    float3 vp = 0, vn = 0;\n    float wl = 1;\n";
+            for (int k = 0; k < mats; k++) {
+                std::string m = k ? F("wvb[%d]", k - 1) : "wv", mn = k ? F("wvnb[%d]", k - 1) : "wvn";
+                std::string w = implied && k == mats - 1 ? "wl" : F("bw[%d]", k);
+                s += F("    vp += %s * mul(ip, %s).xyz;\n    vn += %s * mul(in_n, %s).xyz;\n", w.c_str(), m.c_str(), w.c_str(),
+                       mn.c_str());
+                if (implied && k < mats - 1) s += F("    wl -= bw[%d];\n", k);
+            }
+            s += "    float4 cp = mul(float4(vp, 1), projvp);\n";
+        } else {
+            s += "    float4 cp = mul(ip, wvp);\n";
+            s += "    float3 vp = mul(ip, wv).xyz;\n";
+            s += "    float3 vn = mul(float4(" + v(2, "float4(0,0,0,0)") + ".xyz, 0), wvn).xyz;\n";
+        }
         if (f.light & 8) s += "    vn = dot(vn, vn) > 0 ? normalize(vn) : vn;\n";
     }
     if (lit) {
