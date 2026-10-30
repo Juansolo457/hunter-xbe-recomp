@@ -6,15 +6,17 @@
 #   oovpa <v> an XbSymbolDatabase pattern of revision <v> matched (both agree on all 46 they share)
 # Names at 0 are not linked in Hunter or not found yet; the host traps if one it needs is called.
 #
-# The XDK 4361 layouts come from the overlay below: the SDK ships 4831 and 5849 only, and [xbe] # would look for sdk/xdk/4361/layout.toml.
+# The XDK 4361 layouts come from the overlay below: the SDK ships 4831 and 5849 only, and
+# [xbe] xdk = 4361 would look for sdk/xdk/4361/layout.toml.
 includes = ["xdk/4361/layout.toml"]
 
 [xbe]
 path = "assets/default.xbe"
-title = 0x56550007
-entry = 0xA27C1
+title = 0x56550007  # certificate title id, tools/xbeinfo.py
+entry = 0xA27C1  # header entry XOR the retail key 0xA8FC57AB, tools/xbeinfo.py
 out = "generated/game"
 partitions = 64
+# DOLBY is left out: it holds the Dolby Digital encoder's DSP image, not x86 (docs/FINDINGS.md)
 code_sections = [".text", "D3D", "DSOUND", "D3DX", "XGRPH", "WMADECXM", "WMADEC", "XPP"]
 library = "Hunter.dll"  # <exe>.dll, which the executable delay loads
 

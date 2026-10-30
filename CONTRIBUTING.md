@@ -39,4 +39,6 @@ as a pull request once complete.
 
 Releases are tagged on `master` once the pull requests that make them are merged. **They are
 source only:** never attach builds, game files or test packages. Players build from their own
-disc ([docs/SETUP.md](docs/SETUP.md)).
+disc ([docs/SETUP.md](docs/SETUP.md)). The one exception to building locally is `release.bat`:
+its `Hunter.zip` is for testing on your own machines (a Steam Deck, say) and is never attached to
+a release.
