@@ -72,8 +72,8 @@ out\build\release\Hunter.exe                 # finds assets/ in a folder above i
 | `tools/xiso.py <iso> list \| extract <dir> [paths]` | XDVDFS reader |
 | `tools/xbeinfo.py <xbe>` | header, sections, XDK builds (entry key fixed: entry is `0xA27C1`) |
 | `tools/xbeimports.py <xbe>` | kernel imports against the SDK and `src/` |
-| `tools/oovpa_scan.py <XbSymbolDatabase checkout> <xbe> 4361 [seeds]` | XbSymbolDatabase patterns matched as data; checkout outside the repo |
-| `tools/xbedis.py <xbe> <addr or name> [n]` | capstone disassembly naming known addresses (needs capstone; run without `-I`) |
+| `tools/oovpa_scan.py <XbSymbolDatabase checkout> <xbe> 4361 [--seed X=0x..] [--seed-file f]` | XbSymbolDatabase patterns matched as data; checkout outside the repo |
+| `tools/xbedis.py <xbe> <addr or name> [n]` | capstone disassembly naming known addresses (capstone in a virtual environment, run with its interpreter and `-I`) |
 | `out/build/release/xbe_symbols.exe` | the SDK's scanner; with the 4831 set copied as `<tmp>/4361` it gives the "sig"/"k=" finds |
 
 ## Local paths (not in FINDINGS.md)

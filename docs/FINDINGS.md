@@ -34,13 +34,16 @@ XAPILIB build, so it stops on this XBE. See PLAN.md, M0.
    6 of 13 data. 15 of those matched by constants only; each is labelled with its score.
 2. XbSymbolDatabase's OOVPA patterns (MIT code, ODbL database, not vendored) read as data by a
    Python matcher that mirrors the library's automatic scan; run outside the repo. It agrees with
-   `xbe_symbols` on all 46 functions both found, and adds 60. Seeding it with the device pointer
-   and the step 1 results added 12 more.
+   `xbe_symbols` on all 46 functions both found, and adds 60, 12 of which it found only once
+   seeded with the device pointer and the step 1 results. (Since then the matcher also tests
+   overlapping offsets, as the library does; that adds five `IDirectSoundStream_*` jump stubs
+   into `CDirectSoundStream_*` functions and changes no other match.)
 3. By hand: `XInputGetCapabilities` dropped (the constants match at `0x25DB04` is device-open
    code; `XInputOpen` is `0x25900D`); `D3D_pDevice` `0x212E70` and `D3D_DirtyFlags` `0x20FC28`
    read from the D3D code.
 
-Result: 129 of 248 functions, 8 of 13 data. Of the 118 at 0, 37 are networking and Xbox Live
+Result: 129 of 248 functions (69 from step 1 after step 3's drop, 60 from step 2), 8 of 13
+data. Of the 119 at 0, 37 are networking and Xbox Live
 names (Hunter links no XNET library); the rest are not found yet or not linked.
 
 ### XDK 4361 data layout

@@ -72,7 +72,7 @@ rem helpers
 set TOOLS_OK=
 set MISSING=
 rem a quoted entry in PATH breaks VsDevCmd's own parsing ("... was unexpected at this time")
-set PATH=%PATH:"=%
+set "PATH=%PATH:"=%"
 call "%VSDIR%\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64 >nul
 set "VSCMAKE=%VSDIR%\Common7\IDE\CommonExtensions\Microsoft\CMake"
 set "PATH=%VSCMAKE%\CMake\bin;%VSCMAKE%\Ninja;%VSDIR%\VC\Tools\Llvm\x64\bin;%PATH%"

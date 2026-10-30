@@ -1,13 +1,15 @@
 """Disassemble a function of an XBE, naming known addresses.
 
-    python tools/xbedis.py assets/default.xbe <hex address or name> [count]
+    python -m venv .venv-tools && .venv-tools/Scripts/pip install capstone   (once, outside the repo)
+    .venv-tools/Scripts/python -I tools/xbedis.py assets/default.xbe <hex address or name> [count]
 
 Names come from name<TAB>0xADDR files in the current folder (cfgsyms.tsv, oovpa.tsv, oovpa2.tsv:
-oovpa_scan.py output and the config's symbols). Needs capstone (pip install capstone), so run it
-without -I if capstone is a user-site package. Read-only.
+oovpa_scan.py output and the config's symbols). Needs capstone: install it in a virtual environment
+and run that interpreter with -I, which still loads the environment's own packages but no user-site
+ones. Without a count it stops at the first ret or after 40 instructions. Read-only.
 """
+import argparse
 import struct
-import sys
 
 import capstone
 
@@ -42,16 +44,31 @@ def names():
 
 
 def main():
-    d = open(sys.argv[1], 'rb').read()
-    secs = sections(d)
-    target = sys.argv[2]
+    ap = argparse.ArgumentParser(description='Disassemble a function of an XBE, naming known addresses.')
+    ap.add_argument('xbe')
+    ap.add_argument('target', help='hex address or a name from the .tsv files')
+    ap.add_argument('count', nargs='?', type=int, help='instructions to print (default: to the first ret, at most 40)')
+    args = ap.parse_args()
     table = names()
-    va = table[target] if target in table else int(target, 16)
-    count = int(sys.argv[3]) if len(sys.argv) > 3 else 40
+    if args.target in table:
+        va = table[args.target]
+    else:
+        try:
+            va = int(args.target, 16)
+        except ValueError:
+            ap.error(f'{args.target!r} is neither a known name nor a hex address')
+    if args.count is not None and args.count < 0:
+        ap.error('count must be 0 or more')
+    to_ret = args.count is None
+    count = 40 if to_ret else args.count
+    d = open(args.xbe, 'rb').read()
+    secs = sections(d)
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
     off = fo(secs, va)
     rev = {v: k for k, v in table.items()}
     n = 0
+    if count == 0:
+        return
     for ins in md.disasm(d[off:off + 4096], va):
         note = ''
         for tok in ins.op_str.replace('[', ' ').replace(']', ' ').replace(',', ' ').split():
@@ -61,7 +78,7 @@ def main():
                     note = '  ; ' + rev[v]
         print(f'{ins.address:08X}  {ins.bytes.hex():<20} {ins.mnemonic} {ins.op_str}{note}')
         n += 1
-        if n >= count or (ins.mnemonic == 'ret' and count == 40):
+        if n >= count or (ins.mnemonic == 'ret' and to_ret):
             break
 
 
